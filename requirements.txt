@@ -4,4 +4,6 @@ openai>=1.40
 anthropic>=2.0
 python-dotenv>=1.0
 tzdata  # time zones on Windows
+beautifulsoup4  # crawling bonus
+requests        # crawling bonus
 pytest>=8

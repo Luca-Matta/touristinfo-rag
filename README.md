@@ -26,6 +26,8 @@ python app.py --retrieve-only "Falkenau"                 # no API key needed
 
 python -m eval.run_eval -v      # retrieval eval: dense vs keyword vs hybrid
 python -m pytest -q             # unit tests (offline)
+
+python crawling/crawl.py        # bonus: Bar Oswald page -> JSON (see crawling/README.md)
 ```
 
 The index is built on first run and stored in `.chroma/`. It is rebuilt automatically
@@ -48,7 +50,8 @@ Claude (`claude-opus-5-5`) and embeddings fall back to Chroma's local MiniLM mod
 | `rag/pipeline.py` | Wires it together: `RagPipeline().answer(question)` |
 | `app.py` | CLI (single question, interactive, `--debug`, `--retrieve-only`) |
 | `eval/` | 33 labelled questions (EN/DE/IT) and a retrieval evaluation script |
-| `tests/` | Offline unit tests for parsing, hours logic and retrieval |
+| `tests/` | Offline unit tests for parsing, hours logic, retrieval and the crawler |
+| `crawling/` | Bonus exercise: `crawl.py` extracts a destination page into JSON ([details](crawling/README.md)) |
 
 ## What the data looks like, and what that implies
 
