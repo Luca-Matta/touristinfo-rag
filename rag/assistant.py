@@ -89,7 +89,9 @@ class TouristAssistant:
 
     def retrieve(self, plan: QueryPlan, mode: Mode = "hybrid") -> tuple[list[Record], list[RecordHit]]:
         """Pick the sources for a plan: structured matches first, then search results."""
-        hits = self.retriever.search(plan.queries, categories=plan.categories, mode=mode)
+        hits = self.retriever.search(
+            plan.queries, categories=plan.categories, mode=mode, keyword_queries=plan.keyword_queries
+        )
         structured: list[Record] = []
         if plan.services:
             structured += self.corpus.with_services(plan.services, plan.categories)

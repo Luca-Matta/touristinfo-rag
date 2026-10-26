@@ -51,6 +51,14 @@ class QueryPlan(BaseModel):
         """The phrasings to search with, original first, without duplicates."""
         return list(dict.fromkeys(q for q in (self.standalone_question, self.english_query) if q.strip()))
 
+    @property
+    def keyword_queries(self) -> list[str]:
+        """BM25 only matches words of the (English) corpus: use the English query alone.
+
+        Proper nouns survive the rewrite ("names of places unchanged"), so nothing is lost.
+        """
+        return [self.english_query] if self.english_query.strip() else self.queries
+
     def moment(self, now: dt.datetime) -> dt.datetime:
         """The point in time the question is about: the asked date/time, else now."""
         if self.date is None and self.time is None:

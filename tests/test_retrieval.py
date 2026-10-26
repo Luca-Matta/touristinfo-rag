@@ -64,3 +64,9 @@ def test_modes(retriever):
     for mode in ("dense", "keyword", "hybrid"):
         hits = retriever.search("Falkenau farm shop", mode=mode)
         assert hits and all(name.startswith(mode) or mode == "hybrid" for name in hits[0].ranks)
+
+
+def test_keyword_search_can_use_its_own_phrasings(retriever):
+    hits = retriever.search(["Posso viaggiare in treno?"], keyword_queries=["wheelchair train"], mode="keyword")
+    assert hits[0].record.id.startswith("web-accessible-travel")
+    assert set(hits[0].ranks) == {"keyword:0"}

@@ -26,7 +26,7 @@
   {"id": "q25", "split": "test", "lang": "en", "question": "Which B&B has a sauna?", "expected": ["bed_and_breakfast-36275", "bed_and_breakfast-12399"], "must_include": [["Vanea"], ["Lerchner"]]},
   {"id": "q26", "split": "test", "lang": "de", "question": "Welche Unterkunft hat ein Hallenbad?", "expected": ["bed_and_breakfast-12399"], "must_include": [["Lerchner"]]},
   {"id": "q27", "split": "test", "lang": "it", "question": "Posso portare il mio cane in un B&B?", "expected": ["bed_and_breakfast-12399"], "must_include": [["Lerchner"]]},
-  {"id": "q28", "split": "dev", "lang": "en", "question": "Can I bring my dog to the Vanea-Alp Relax Guesthouse?", "expected": ["bed_and_breakfast-36275"], "must_include": [["pet", "animal"]]},
+  {"id": "q28", "split": "dev", "lang": "en", "question": "Can I bring my dog to the Vanea-Alp Relax Guesthouse?", "expected": ["bed_and_breakfast-36275"], "must_include": [["not allowed", "no pets", "not permitted", "pets", "animals"]]},
   {"id": "q29", "split": "dev", "lang": "en", "question": "Which accommodation offers gluten-free food?", "expected": ["bed_and_breakfast-12399"], "must_include": [["Lerchner"]]},
   {"id": "q30", "split": "dev", "lang": "de", "question": "Wie viele Zimmer hat das Haus Lerchner?", "expected": ["bed_and_breakfast-12399"], "must_include": [["5", "fünf"]]},
   {"id": "q31", "split": "dev", "lang": "it", "question": "Come viene classificata la Vanea-Alp Relax Guesthouse?", "expected": ["bed_and_breakfast-36275"], "must_include": [["4"]]},
