@@ -12,6 +12,21 @@ from .exports import parse_export_file
 from .text import fold
 from .web import parse_web_file
 
+# Guest wording -> the wording of the exports' service lists (folded, substring match).
+SERVICE_SYNONYMS = {
+    "pet": "dogs allowed",
+    "dog": "dogs allowed",
+    "gluten": "glutine",
+    "wifi": "wlan",
+    "wi-fi": "wlan",
+    "internet": "wlan",
+    "lift": "elevator",
+    "parking": "car park",
+    "swimming pool": "pool",
+    "spa": "wellness",
+}
+NEGATIONS = ("no ", "not ", "without ")
+
 
 @dataclass
 class Corpus:
@@ -32,11 +47,25 @@ class Corpus:
         return [r for r in self if r.kind is RecordKind.PLACE and (not wanted or r.category in wanted)]
 
     def with_services(self, terms: Iterable[str], categories: Iterable[Category] = ()) -> list[Record]:
-        """Places offering *all* the given services (accent/case-insensitive substring match)."""
-        folded = [fold(t) for t in terms if t.strip()]
+        """Places offering *all* the given services (accent/case-insensitive substring match).
+
+        Common guest wordings are mapped to the export wording ("pet friendly" -> "dogs
+        allowed"), and negated entries never match: "No pets or domestic animals" is not a
+        match for "pets".
+        """
+        folded = [_service_term(t) for t in terms if t.strip()]
         if not folded:
             return []
-        return [r for r in self.places(categories) if all(any(t in fold(s) for s in r.services) for t in folded)]
+
+        def offers(record: Record, term: str) -> bool:
+            return any(term in s and not s.startswith(NEGATIONS) for s in map(fold, record.services))
+
+        return [r for r in self.places(categories) if all(offers(r, t) for t in folded)]
+
+
+def _service_term(term: str) -> str:
+    folded = fold(term.strip())
+    return next((target for word, target in SERVICE_SYNONYMS.items() if word in folded), folded)
 
 
 def load_corpus(data_dir: str | Path) -> Corpus:

@@ -1,12 +1,13 @@
 # Bonus: structured extraction from a destination page
 
 ```bash
-pip install -e ".[crawl]"                # requests + beautifulsoup4 (playwright optional)
-python crawling/crawl.py                 # Bar Oswald page from the exercise, JSON to stdout
-python crawling/crawl.py <other valgardena.it address URL>
-python crawling/crawl.py --format export # same block format as data/ti_export_*.txt
-python crawling/crawl.py --schema        # JSON schema of the output
-python crawling/crawl.py --html saved.html --no-llm   # offline
+cd crawling
+pip install -r requirements.txt          # or, from the repo root: pip install -e ".[crawl]"
+python crawl.py                          # Bar Oswald page from the exercise, JSON to stdout
+python crawl.py <other valgardena.it address URL>
+python crawl.py --format export          # same block format as data/ti_export_*.txt
+python crawl.py --schema                 # JSON schema of the output
+python crawl.py --html saved.html --no-llm   # offline
 ```
 
 Output (validated by the pydantic model `Place`): `name`, `category` (the page's own
@@ -29,8 +30,11 @@ a postcode line), tables whose header row is `Mo Tu We Th Fr Sa Su`, the
 `#c_..._container` section anchors, route-planner links with `toLat`/`toLon`.
 
 **Validated output.** Times must be `HH:MM`, weekdays are an enum, coordinates are range
-checked. A selector that breaks after a redesign produces an error, not silently wrong
-JSON.
+checked, so a value that is extracted is well-formed. A selector that finds nothing is a
+different failure: a missing name is an error, a missing phone or address is `null`, and
+when no weekday table is found `opening_hours` is empty and `notes` (and stderr) say so.
+What validation cannot catch is a table that parses but means something else, e.g. a
+redesign that puts an icon in every day cell, closed days included.
 
 **Polite fetching.** The crawler identifies itself, checks `robots.txt`, fetches one
 page, and falls back to headless Playwright only when the plain request fails or the page

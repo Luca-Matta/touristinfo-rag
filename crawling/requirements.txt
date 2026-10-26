@@ -1,0 +1,6 @@
+# Standalone install for the crawler: pip install -r requirements.txt
+requests>=2.31
+beautifulsoup4>=4.12
+pydantic>=2.6
+openai>=1.40      # optional: LLM-written description (a template is used without OPENAI_API_KEY)
+# playwright>=1.45  # optional: only if the plain HTTP fetch fails; then `playwright install chromium`

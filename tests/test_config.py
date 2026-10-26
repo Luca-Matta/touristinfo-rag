@@ -18,3 +18,9 @@ def test_explicit_choice_and_validation():
     assert s.embedding_provider == "local" and s.top_k == 3
     with pytest.raises(ConfigError):
         Settings.from_env({"LLM_PROVIDER": "mistral"})
+
+
+@pytest.mark.parametrize("env", [{"TOP_K": "0"}, {"TOP_K": "five"}, {"TOP_K": "-3"}, {"TIMEZONE": "Europe/Kiens"}])
+def test_invalid_values_fail_at_start_up(env):
+    with pytest.raises(ConfigError):
+        Settings.from_env(env)

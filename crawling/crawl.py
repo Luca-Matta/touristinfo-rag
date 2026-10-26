@@ -358,6 +358,10 @@ def extract(html: str, url: str, use_llm: bool = True) -> Place:
         raise CrawlError("no place name found: is this an address detail page?")
     block = contact_block(soup)
     hours, notes = extract_opening_hours(soup)
+    if not hours:
+        note = "no opening-hours table with Mo..Su columns found: opening_hours is empty, check the page"
+        notes.append(note)
+        print(f"[crawl] {note}", file=sys.stderr)
     contact = Contact(
         phone=extract_phone(soup),
         email=extract_email(soup),

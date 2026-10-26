@@ -77,3 +77,10 @@ def test_schema_and_cli(capsys):
     assert "opening_hours" in capsys.readouterr().out
     assert crawl.main(["--html", str(ROOT / "tests/fixtures/address_page_synthetic.html"), "--no-llm"]) == 0
     assert '"name": "Example Bar"' in capsys.readouterr().out
+
+
+def test_missing_hours_table_is_reported_not_silent():
+    without_header = HTML.replace("<th>Mo</th>", "<th>Montag</th>")
+    place = crawl.extract(without_header, crawl.DEFAULT_URL, use_llm=False)
+    assert place.opening_hours == []
+    assert any("no opening-hours table" in n for n in place.notes)

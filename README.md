@@ -10,7 +10,7 @@ guest message + history
    │
    ▼
 query planner (1 small LLM call, JSON schema)
-   standalone question · English query · language · categories · date/time · services · "list all"
+   standalone question · English query · language · categories · day/time · services · "list all"
    │
    ▼
 hybrid retrieval: Chroma (cosine) + BM25, over both phrasings, fused per record with RRF
@@ -33,7 +33,7 @@ python app.py --debug "Ist das Museum Ladin am Montag geöffnet?"   # plan + sou
 python app.py                                                      # chat, follow-ups work
 python app.py --retrieve-only "Falkenau"                           # no API key needed
 
-pytest                                          # 51 offline tests
+pytest                                          # 79 offline tests
 python -m eval.run_eval retrieval               # offline retrieval eval, dev split
 python -m eval.run_eval answers --judge -v      # end-to-end eval (LLM calls)
 python crawling/crawl.py                        # bonus, see crawling/README.md
@@ -50,7 +50,9 @@ Everything can be overridden in `.env`, including a cheaper `PLANNER_MODEL`.
 
 **Cost.** A question is two LLM calls: the planner (~600 input tokens) and the answer
 (~2-4k input tokens of sources). With `gpt-4.1-mini` that is roughly $0.002 per question;
-indexing the whole corpus with OpenAI embeddings costs well under one cent.
+indexing the whole corpus with OpenAI embeddings costs well under one cent. The Claude
+default (`claude-opus-5-5`) is far more expensive per token, so with Anthropic set
+`PLANNER_MODEL` (and ideally `ANTHROPIC_MODEL`) to a small model.
 
 ## Layout
 
@@ -84,7 +86,10 @@ Reading the corpus first shaped most decisions:
 3. **Opening hours are Python dict literals.** They are parsed with `ast.literal_eval`
    (literals only, no code execution) and every "is it open?" question is answered in
    code for the moment the guest asks about ("now", "on Sunday", "tomorrow at 8"), because
-   LLMs are unreliable at weekday and date arithmetic. The exports list the days a place
+   LLMs are unreliable at weekday and date arithmetic. That includes the date itself: the
+   planner only names the day as the guest said it (`"sunday"`, `"tomorrow"`, `"12-24"`)
+   and `rag/planner.py` computes the calendar date, so "Sunday" asked on a Monday is the
+   coming Sunday, never yesterday. The exports list the days a place
    *is* open, so an unlisted day is reported as "no hours listed (possibly closed)" rather
    than "closed".
 4. **Guests write in three languages, the text is English.** Three things bridge it: the
@@ -113,34 +118,48 @@ unfiltered search when it leaves fewer than k results.
 
 **A planner instead of a bigger prompt.** One cheap structured-output call resolves
 follow-ups ("und am Sonntag?"), produces the English query, detects the language and
-extracts date, time, categories and services. Its output is validated with pydantic; on
-any failure the pipeline falls back to the raw question, so planning can only help.
+extracts the day, time, categories and services. Its output is validated with pydantic,
+and an invalid plan falls back to the raw question, so the planner cannot break the
+pipeline. A valid but wrong plan can still hurt an answer, so the parts that matter most
+are not left to the model: the code computes the date from the day it names, and removes
+the destination name ("in Kiens/Chienes") from the queries unless the guest wrote it.
 
 **Grounding and prompt injection.** Sources are reference data in `<source>` tags with
 their content HTML-escaped, so a scraped page cannot close its tag and pose as
 instructions. The system prompt asks for answers only from the sources, with `[n]`
 citations, and to say so when the answer is missing. It contains nothing per-request
-(time and sources go in the user turn), so it is byte-identical and cacheable.
+(time and sources go in the user turn), so it is byte-identical across requests. At about
+250 tokens it is still below the providers' minimum for prompt caching; the layout pays
+off once the prompt grows (with Anthropic it would also need a `cache_control` marker).
 
 **Small, swappable parts.** `Embedder` and `ChatModel` are protocols; the tests use a
-hash embedder and a scripted fake LLM, so all 51 tests run offline in under a second.
+hash embedder and a scripted fake LLM, so all 79 tests run offline in under a second.
 SDK exceptions become a `ProviderError` with a readable message. Settings are read once,
-explicitly, from the environment, and invalid values fail at start-up. `ruff`, `mypy
+explicitly, from the environment; an unknown provider, a `TOP_K` that is not a positive
+integer or an unknown `TIMEZONE` fails at start-up. `ruff`, `mypy
 --strict` and the tests run in CI together with the offline retrieval eval.
 
 ## Evaluation
 
 `eval/questions.json` holds 69 questions (29 EN, 21 DE, 19 IT) with the record ids that
-can answer them, facts the answer must contain (with accepted spellings), optional chat
-history for follow-ups, a fixed "now" (Monday 26.10.2026, 10:00) so hours answers are
-reproducible, and three questions the data cannot answer. They are split per language
-into `dev` (46, inspect and tune) and `test` (23, only report).
+can answer them, facts the answer must contain (with accepted spellings), phrases it must
+not contain, a reference note where the data has a trap (Vanea serves breakfast only on
+request, one church is locked), optional chat history for follow-ups, a fixed "now"
+(Monday 26.10.2026, 10:00) so hours answers are reproducible, and three questions the
+data cannot answer. They are split per language into `dev` (46, inspect and tune) and
+`test` (23, only report).
 
 * `eval.run_eval retrieval` reports hit@5 and MRR per retriever and language. Offline it
   uses the raw question; `--planner` adds the LLM planning step (plans are cached in
   `eval/.cache`, so reruns are free).
-* `eval.run_eval answers` runs the whole pipeline and checks the required facts;
-  `--judge` adds an LLM judge for groundedness, correctness and answer language.
+* `eval.run_eval answers` runs the whole pipeline and checks the required facts (a number
+  must match as a whole number, so "5 rooms" is not found inside a phone number) and the
+  forbidden phrases. `--judge` adds an LLM judge that is a different, stronger model than
+  the one answering (`gpt-4.1` by default, `--judge-model` to change it). It sees the
+  expected records and the reference note next to the retrieved sources, lists the
+  issues it finds, and grades grounded, correct, complete and language. Every row,
+  including the plan and the sources, is appended to `eval/.cache/answers-*.jsonl` as
+  it is produced.
 
 **Retrieval**, hit@5 / MRR over the 67 questions with an expected source:
 
@@ -153,32 +172,33 @@ Offline, the retrievers fail on different questions (BM25 does not know "Brot", 
 does not understand Italian), which is why fusion helps; the remaining misses are
 follow-ups and cross-lingual questions, the cases the planner exists for.
 
-**Answers** (OpenAI embeddings, `gpt-4.1-mini` for planner, answers and judge), dev split:
-
-| check | result |
-| --- | --- |
-| an expected source among the sources | 46/46 |
-| all required facts in the answer | 46/46 |
-| judge: grounded in the sources | 46/46 |
-| judge: correct (incl. "not in the data" for unanswerable) | 46/46 |
-| judge: answered in the guest's language | 46/46 |
-
-`python -m eval.run_eval answers --judge --split test` reports the held-out split.
+**Answers.** A first run (OpenAI embeddings, `gpt-4.1-mini` for planner, answers and
+judge, dev split) scored 46/46 on every check. That number was too good: rereading the
+answers against `data/` found 6 with problems the checks let through. Two were wrong
+(q22 said both B&Bs include breakfast, Vanea only serves it on request; q48 called every
+church open and then St. Martin locked), four were imprecise or unsupported (praise for
+the bakeries, Market Engl without its afternoon hours, a phone number credited to the
+tourist office, a detail about Bolzano station). The fact checks had passed by
+coincidence (a "5" inside a phone number), and the judge was the answering model, seeing
+only the retrieved sources. The checks and the judge described above are the response;
+`python -m eval.run_eval answers --judge --split all` gives the current numbers.
 
 **How the eval changed the code.** The first run with a key showed four misses: the
-planner appended "in Kiens/Chienes" to every query, and since every source mentions the
-area, that phrase diluted both retrievers. The planner now adds nothing the guest did not
-write. The answer eval then showed one question answered with "no information" although
-dense search had found the page: BM25 over the Italian phrasing produced noise lists that
-outvoted it, so keyword search now uses the English rewrite only.
+planner appended "in Kiens/Chienes" to most queries, and since every source mentions the
+area, that phrase diluted both retrievers. Telling it not to in the prompt was not enough
+(it still did in 8 of 67 English queries), so the code now strips the destination name
+from the plan unless the guest wrote it. The answer eval then showed one question
+answered with "no information" although dense search had found the page: BM25 over the
+Italian phrasing produced noise lists that outvoted it, so keyword search now uses the
+English rewrite only.
 
 **Read these numbers with care.** Those fixes were found by looking at misses across all
-questions, so the test split is no longer untouched, and at 100% the set is saturated: it
-can catch regressions but not show further improvement. One question moves a score by
-1.5 to 4.5 points. The judge is the same model that answers and only sees the retrieved
-sources, so it cannot tell that "the sources don't say" was wrong when retrieval missed;
-the `source retrieved` and fact checks cover that case. A credible benchmark would need
-questions written by others or taken from real guest logs.
+questions, so the test split is no longer untouched, and at 100% retrieval is saturated:
+it can catch regressions but not show further improvement. One question moves a score by
+1.5 to 4.5 points, and one run is one sample: two runs give different wording, so
+compare runs by their failures, not by a point of difference. Six test questions are
+translations of dev questions. A credible benchmark would need questions written by
+others or taken from real guest logs, and several runs.
 
 ## Limitations and next steps
 
@@ -186,8 +206,12 @@ questions written by others or taken from real guest logs.
   about them; the wording stays factual ("no hours listed").
 * **Two LLM calls per question.** For latency, the planner could run on a small model
   (`PLANNER_MODEL`) or be skipped for single-turn questions in the guest's corpus language.
-* **Service matching** is substring-based over the services list ("dogs allowed" is
-  found, "pet friendly" is not); a synonym table or embedding match would fix that.
+* **Overnight hours** ("18:00 - 01:00") are not modelled: the corpus has none, but bars
+  imported with the crawler could.
+* **Service matching** is substring-based over the services list, with a small synonym
+  table ("pet friendly" finds "Dogs allowed", "gluten-free" finds "Cuisine without
+  glutine") and negated entries skipped ("No pets or domestic animals" never matches
+  "pets"). Wordings outside the table are missed; an embedding match would cover them.
 * **Re-ranking** with a cross-encoder becomes worth it once the corpus grows beyond a few
   hundred records; so does a search engine with native hybrid search instead of
   in-process BM25, and incremental indexing instead of rebuild-on-hash.

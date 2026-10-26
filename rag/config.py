@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .errors import ConfigError
 
@@ -54,6 +55,14 @@ class Settings:
             raise ConfigError(f"LLM_PROVIDER must be openai, anthropic or auto, not '{llm}'")
 
         defaults = cls()
+        top_k = get("TOP_K", str(defaults.top_k))
+        if not top_k.isdigit() or int(top_k) < 1:
+            raise ConfigError(f"TOP_K must be a positive integer, not '{top_k}'")
+        timezone = get("TIMEZONE", defaults.timezone)
+        try:
+            ZoneInfo(timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ConfigError(f"TIMEZONE must be an IANA time zone such as Europe/Rome, not '{timezone}'") from None
         return cls(
             data_dir=Path(get("DATA_DIR", str(defaults.data_dir))),
             index_dir=Path(get("INDEX_DIR", str(defaults.index_dir))),
@@ -63,6 +72,6 @@ class Settings:
             openai_chat_model=get("OPENAI_CHAT_MODEL", defaults.openai_chat_model),
             anthropic_model=get("ANTHROPIC_MODEL", defaults.anthropic_model),
             planner_model=get("PLANNER_MODEL") or None,
-            top_k=int(get("TOP_K", str(defaults.top_k))),
-            timezone=get("TIMEZONE", defaults.timezone),
+            top_k=int(top_k),
+            timezone=timezone,
         )

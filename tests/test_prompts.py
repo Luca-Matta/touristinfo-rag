@@ -1,5 +1,3 @@
-from datetime import date
-
 from rag.generation.prompts import SYSTEM_PROMPT, build_user_message, format_sources, status_line
 from rag.models import Category, Record, RecordKind
 from rag.planner import QueryPlan, trivial_plan
@@ -14,7 +12,7 @@ def plan(**kw):
 def test_status_now_for_the_date_asked_and_for_places_without_hours(corpus):
     bakery = corpus["bakery-3383"]
     assert status_line(bakery, trivial_plan("q"), MONDAY_10AM) == "Status right now (Monday 10:00): open (until 19:00)"
-    sunday = status_line(bakery, plan(date=date(2026, 11, 1)), MONDAY_10AM)
+    sunday = status_line(bakery, plan(day="sunday"), MONDAY_10AM)
     assert sunday == "Status on Sunday 01.11.2026: no opening hours listed for Sun (possibly closed)"
     assert status_line(corpus["butcher-2625"], trivial_plan("q"), MONDAY_10AM) is None
 

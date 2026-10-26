@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import Any
+import re
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -29,6 +30,40 @@ from .models import CATEGORY_LABELS, LANGUAGES, Category, Language
 log = logging.getLogger(__name__)
 
 PLACE_CATEGORIES = [c for c in Category if c is not Category.WEB_PAGE]
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+RELATIVE_DAYS = ("today", "tomorrow", "day_after_tomorrow")
+DayRef = Literal[
+    "today",
+    "tomorrow",
+    "day_after_tomorrow",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+]
+
+
+def resolve_day(ref: DayRef, today: dt.date) -> dt.date:
+    """'tomorrow' -> today + 1; a weekday -> its next occurrence, today included."""
+    if ref in RELATIVE_DAYS:
+        return today + dt.timedelta(days=RELATIVE_DAYS.index(ref))
+    return today + dt.timedelta(days=(WEEKDAYS.index(ref) - today.weekday()) % 7)
+
+
+def resolve_month_day(month_day: str, today: dt.date) -> dt.date | None:
+    """'12-24' -> the next 24 December, today included; an impossible date -> None."""
+    month, day = (int(x) for x in month_day.split("-"))
+    for year in range(today.year, today.year + 5):  # 02-29 can be up to four years away
+        try:
+            d = dt.date(year, month, day)
+        except ValueError:
+            continue
+        if d >= today:
+            return d
+    return None
 
 
 class QueryPlan(BaseModel):
@@ -36,7 +71,8 @@ class QueryPlan(BaseModel):
     english_query: str
     language: Language | None = None
     categories: list[Category] = Field(default_factory=list)
-    date: dt.date | None = None
+    day: DayRef | None = None
+    month_day: str | None = Field(default=None, pattern=r"^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$")
     time: dt.time | None = None
     services: list[str] = Field(default_factory=list)
     list_all: bool = False
@@ -59,15 +95,22 @@ class QueryPlan(BaseModel):
         """
         return [self.english_query] if self.english_query.strip() else self.queries
 
+    def date(self, today: dt.date) -> dt.date | None:
+        """The calendar day the question is about, if it names one."""
+        if self.month_day is not None:
+            return resolve_month_day(self.month_day, today)
+        return resolve_day(self.day, today) if self.day is not None else None
+
     def moment(self, now: dt.datetime) -> dt.datetime:
-        """The point in time the question is about: the asked date/time, else now."""
-        if self.date is None and self.time is None:
+        """The point in time the question is about: the asked day/time, else now."""
+        day = self.date(now.date())
+        if day is None and self.time is None:
             return now
-        return dt.datetime.combine(self.date or now.date(), self.time or dt.time(12, 0), tzinfo=now.tzinfo)
+        return dt.datetime.combine(day or now.date(), self.time or dt.time(12, 0), tzinfo=now.tzinfo)
 
     @property
     def asks_about_other_time(self) -> bool:
-        return self.date is not None or self.time is not None
+        return self.day is not None or self.month_day is not None or self.time is not None
 
 
 def trivial_plan(question: str) -> QueryPlan:
@@ -85,7 +128,8 @@ PLAN_SCHEMA: dict[str, Any] = {
         "english_query": {"type": "string"},
         "language": {"type": "string", "enum": [*LANGUAGES, "other"]},
         "categories": {"type": "array", "items": {"type": "string", "enum": [str(c) for c in PLACE_CATEGORIES]}},
-        "date": _nullable({"type": "string", "description": "YYYY-MM-DD"}),
+        "day": _nullable({"type": "string", "enum": [*RELATIVE_DAYS, *WEEKDAYS]}),
+        "month_day": _nullable({"type": "string", "description": "MM-DD"}),
         "time": _nullable({"type": "string", "description": "HH:MM, 24h"}),
         "services": {"type": "array", "items": {"type": "string"}},
         "list_all": {"type": "boolean"},
@@ -95,7 +139,8 @@ PLAN_SCHEMA: dict[str, Any] = {
         "english_query",
         "language",
         "categories",
-        "date",
+        "day",
+        "month_day",
         "time",
         "services",
         "list_all",
@@ -114,14 +159,34 @@ every source is about the area, so it only dilutes the search.
 - language: the language of the latest message (en, de, it, or other).
 - categories: place categories the guest asks about; empty if none or unsure. Options:
 {categories}
-- date / time: only if the guest asks about a specific day or time (resolve "tomorrow", \
-"on Sunday", "tonight" relative to the current time below); otherwise null.
-- services: facilities the guest requires, as short English terms matching typical \
-accommodation services (e.g. "sauna", "dogs allowed", "indoor pool"); empty if none \
-or if the guest is not looking for a place to stay or eat.
+- day: the day the guest asks about, as said: "today" (also "tonight"), "tomorrow", \
+"day_after_tomorrow" or a weekday ("monday" ... "sunday"); otherwise null. Do not convert \
+it to a date.
+- month_day: only if the guest names a calendar date ("on 24 December" -> "12-24"); otherwise null.
+- time: only if the guest asks about a time of day, as "HH:MM" 24h ("tonight" -> "20:00"); \
+otherwise null.
+- services: facilities the guest requires of a place to stay, as short English terms \
+matching typical accommodation services (e.g. "sauna", "dogs allowed", "indoor pool"); \
+empty if none or if the guest is not looking for accommodation.
 - list_all: true if the guest wants all places of a category (e.g. "list all churches").
 
 Current local time: {now}"""
+
+DESTINATION = re.compile(
+    r"(?:,?\s+(?:in|at|near|around|im|bei|um|a|ad|di|presso|nei dintorni di))?\s*\b(?:Kiens|Chienes)"
+    r"(?:\s*/\s*(?:Kiens|Chienes))?\b",
+    re.IGNORECASE,
+)
+
+
+def strip_destination(text: str) -> str:
+    """'Bakery in Kiens/Chienes open Sunday' -> 'Bakery open Sunday'.
+
+    Every source is about the destination, so its name only dilutes the search. The prompt
+    says so too, but models add it anyway, so it is removed here unless the guest wrote it.
+    """
+    stripped = re.sub(r"\s+([?.!,])", r"\1", DESTINATION.sub("", text)).strip()
+    return stripped or text
 
 
 class LLMPlanner:
@@ -138,6 +203,9 @@ class LLMPlanner:
             if data.get("language") == "other":
                 data["language"] = None
             plan = QueryPlan.model_validate(data)
+            if not DESTINATION.search(" ".join([question, transcript])):
+                plan.standalone_question = strip_destination(plan.standalone_question)
+                plan.english_query = strip_destination(plan.english_query)
         except (ProviderError, ValidationError) as exc:
             log.warning("query planning failed, searching with the raw question: %s", exc)
             return trivial_plan(question)

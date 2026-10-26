@@ -61,6 +61,13 @@ def test_services_filter(corpus):
     assert corpus.with_services(["helipad"]) == []
 
 
+def test_services_synonyms_and_negations(corpus):
+    # Vanea lists "No pets or domestic animals": a negated service never matches.
+    assert [r.id for r in corpus.with_services(["pets"])] == ["bed_and_breakfast-12399"]
+    assert [r.id for r in corpus.with_services(["pet friendly"])] == ["bed_and_breakfast-12399"]
+    assert [r.id for r in corpus.with_services(["gluten-free"])] == ["bed_and_breakfast-12399"]
+
+
 def test_overview_lists_every_place(corpus):
     overview = corpus["church-overview"].description
     assert "All 5 entries" in overview

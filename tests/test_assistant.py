@@ -12,7 +12,8 @@ def plan(**kw):
         "english_query": "q",
         "language": "en",
         "categories": [],
-        "date": None,
+        "day": None,
+        "month_day": None,
         "time": None,
         "services": [],
         "list_all": False,
@@ -39,7 +40,7 @@ def test_end_to_end_with_history(corpus, retriever, settings):
             standalone_question="Is Gatterer open on Sunday?",
             english_query="Gatterer bakery Sunday",
             categories=["bakery"],
-            date="2026-11-01",
+            day="sunday",
         ),
         "No hours are listed for Sunday [1].",
     )

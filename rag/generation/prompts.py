@@ -37,8 +37,9 @@ def status_line(record: Record, plan: QueryPlan, now: datetime) -> str | None:
     """Opening status for the moment the question is about, computed in code."""
     if record.hours is None:
         return None
-    if plan.date is not None and plan.time is None:
-        return f"Status on {plan.date:%A %d.%m.%Y}: {record.hours.on_day(plan.date)}"
+    day = plan.date(now.date())
+    if day is not None and plan.time is None:
+        return f"Status on {day:%A %d.%m.%Y}: {record.hours.on_day(day)}"
     moment = plan.moment(now)
     label = f"on {moment:%A %d.%m.%Y at %H:%M}" if plan.asks_about_other_time else f"right now ({moment:%A %H:%M})"
     return f"Status {label}: {record.hours.status_at(moment).text}"
