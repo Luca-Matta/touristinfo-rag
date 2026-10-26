@@ -32,7 +32,7 @@ def test_plan_is_parsed_and_validated():
     call = llm.calls[0]
     assert call["schema"] is PLAN_SCHEMA
     assert "Monday 2026-10-26 10:00" in call["system"]
-    assert "Wo ist das Museum Ladin?" in call["messages"][0]["content"]  # history is passed on
+    assert "Wo ist das Museum Ladin?" in call["messages"][0]["content"]
 
 
 def test_other_language_becomes_none():

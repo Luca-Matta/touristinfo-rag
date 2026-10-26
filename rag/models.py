@@ -101,9 +101,9 @@ FILE_CATEGORIES: dict[str, Category] = {
 
 
 class RecordKind(StrEnum):
-    PLACE = "place"  # one entity from a structured export
+    PLACE = "place"
     OVERVIEW = "overview"  # "all bakeries": answers list questions in one piece
-    WEB_SECTION = "web_section"  # one section of a scraped web page
+    WEB_SECTION = "web_section"
 
 
 @dataclass(frozen=True)

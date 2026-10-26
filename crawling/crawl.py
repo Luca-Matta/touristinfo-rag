@@ -53,9 +53,6 @@ POSTAL_LINE = re.compile(r"^(?P<postal_code>\d{5})\s+(?P<locality>[^-–,]+?)(?:
 HHMM = r"^\d{2}:\d{2}$"
 
 
-# --------------------------------------------------------------------------- output schema
-
-
 class OpeningPeriod(BaseModel):
     valid_from: date | None = Field(description="first day of the validity period")
     valid_to: date | None = Field(description="last day of the validity period")
@@ -95,9 +92,6 @@ class Place(BaseModel):
     notes: list[str] = Field(default_factory=list, description="assumptions and data problems found on the page")
 
 
-# --------------------------------------------------------------------------- fetching
-
-
 class CrawlError(Exception):
     pass
 
@@ -132,7 +126,7 @@ def allowed_by_robots(url: str) -> bool:
 
 def fetch_with_browser(url: str) -> str:
     try:
-        from playwright.sync_api import sync_playwright  # optional heavy dependency
+        from playwright.sync_api import sync_playwright
     except ImportError as e:
         raise CrawlError("the page needs a browser: pip install playwright && playwright install chromium") from e
 
@@ -143,9 +137,6 @@ def fetch_with_browser(url: str) -> str:
         html = page.content()
         browser.close()
     return html
-
-
-# --------------------------------------------------------------------------- field extractors
 
 
 def page_title(soup: BeautifulSoup) -> str:
@@ -333,9 +324,6 @@ def extract_description_text(soup: BeautifulSoup) -> str:
     return str(meta["content"]).strip() if isinstance(meta, Tag) and meta.get("content") else ""
 
 
-# --------------------------------------------------------------------------- description
-
-
 def template_description(name: str, category: str | None, locality: str | None, raw: str) -> str:
     """Offline fallback: two factual sentences built only from extracted fields."""
     kind = f"{category.lower()} venue" if category else "venue"
@@ -361,9 +349,6 @@ def llm_description(name: str, raw: str, page_text: str) -> str | None:
         max_completion_tokens=300,
     )
     return (resp.choices[0].message.content or "").strip() or None
-
-
-# --------------------------------------------------------------------------- extraction
 
 
 def extract(html: str, url: str, use_llm: bool = True) -> Place:

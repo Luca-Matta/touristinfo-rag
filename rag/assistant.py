@@ -37,7 +37,7 @@ from .planner import LLMPlanner, QueryPlan, trivial_plan
 from .retrieval import HybridRetriever, Mode, RecordHit
 
 MAX_SOURCES = 12
-HISTORY_TURNS = 6  # messages of chat history sent to the answer model
+HISTORY_MESSAGES = 6
 ANSWER_MAX_TOKENS = 4000
 
 
@@ -80,8 +80,6 @@ class TouristAssistant:
     def now(self) -> datetime:
         return datetime.now(self.tz)
 
-    # ------------------------------------------------------------------ steps
-
     def plan(self, question: str, history: Sequence[Message] = (), now: datetime | None = None) -> QueryPlan:
         if self.planner is None:
             return trivial_plan(question)
@@ -100,8 +98,6 @@ class TouristAssistant:
         records = list({r.id: r for r in [*structured, *(h.record for h in hits)]}.values())
         return records[:MAX_SOURCES], hits
 
-    # ------------------------------------------------------------------ end to end
-
     def ask(
         self,
         question: str,
@@ -118,7 +114,7 @@ class TouristAssistant:
             return answer
 
         messages: list[Message] = [
-            *list(history)[-HISTORY_TURNS:],
+            *list(history)[-HISTORY_MESSAGES:],
             {"role": "user", "content": build_user_message(question, sources, plan, now)},
         ]
         answer.completion = self.llm.complete(SYSTEM_PROMPT, messages, max_tokens=ANSWER_MAX_TOKENS)

@@ -57,7 +57,7 @@ class Settings:
         return cls(
             data_dir=Path(get("DATA_DIR", str(defaults.data_dir))),
             index_dir=Path(get("INDEX_DIR", str(defaults.index_dir))),
-            embedding_provider=cast(EmbeddingProvider, embedding),  # validated above
+            embedding_provider=cast(EmbeddingProvider, embedding),
             openai_embedding_model=get("OPENAI_EMBEDDING_MODEL", defaults.openai_embedding_model),
             llm_provider=cast(LLMProvider, llm) if llm else None,
             openai_chat_model=get("OPENAI_CHAT_MODEL", defaults.openai_chat_model),

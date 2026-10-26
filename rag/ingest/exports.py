@@ -49,9 +49,6 @@ class ParseResult:
     description: str = ""  # the file header's description and example questions
 
 
-# --------------------------------------------------------------------------- line handlers
-# Each handler receives the regex match and the dict of fields collected so far.
-
 Fields = dict[str, Any]
 
 
@@ -134,9 +131,6 @@ LINE_HANDLERS: list[tuple[re.Pattern[str], Callable[[re.Match[str], Fields], Non
     (re.compile(r"^Altitude: (?P<altitude>[\d.]+)"), _altitude),
     (re.compile(r"^.+? offers the following services: (?P<services>.+)$"), _services),
 ]
-
-
-# --------------------------------------------------------------------------- parsing
 
 
 def parse_record(block: str, category: Category, source_file: str) -> tuple[Record | None, list[str]]:

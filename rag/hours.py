@@ -91,8 +91,6 @@ class OpeningHours:
                 continue
         return cls(tuple(rules)) if rules else None
 
-    # ------------------------------------------------------------------ description
-
     def describe(self) -> str:
         """E.g. 'Mon-Fri 07:45-12:00, 15:00-18:30; Sat 07:45-12:00; other days not listed'."""
         by_season: dict[tuple[DayMonth, DayMonth], list[HoursRule]] = defaultdict(list)
@@ -119,8 +117,6 @@ class OpeningHours:
                 text += f" (season {start[0]:02d}.{start[1]:02d} - {end[0]:02d}.{end[1]:02d})"
             parts.append(text)
         return " | ".join(parts)
-
-    # ------------------------------------------------------------------ evaluation
 
     def status_at(self, at: datetime) -> HoursStatus:
         today = [r for r in self.rules if r.applies_on(at.date())]

@@ -48,7 +48,7 @@ def format_sources(records: Sequence[Record], plan: QueryPlan, now: datetime) ->
     blocks = []
     for n, record in enumerate(records, start=1):
         text = record.context_text(plan.language)
-        if status := status_line(record, plan, now):  # right under the title line
+        if status := status_line(record, plan, now):
             title, _, rest = text.partition("\n")
             text = f"{title}\n{status}\n{rest}".rstrip("\n")
         body = escape(text, quote=False)  # a source cannot close its own tag

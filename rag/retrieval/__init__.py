@@ -30,7 +30,7 @@ Mode = Literal["hybrid", "dense", "keyword"]
 class RecordHit:
     record: Record
     score: float
-    ranks: dict[str, int] = field(default_factory=dict)  # "dense:0" -> rank, for --debug
+    ranks: dict[str, int] = field(default_factory=dict)
 
 
 class HybridRetriever:

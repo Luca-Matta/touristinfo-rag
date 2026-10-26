@@ -68,9 +68,6 @@ def load_items(split: Split) -> list[EvalItem]:
     return [i for i in items if split == "all" or i.split == split]
 
 
-# ---------------------------------------------------------------------- planning
-
-
 class PlanCache:
     """Plans keyed by model and input, so repeated eval runs cost nothing."""
 
@@ -94,9 +91,6 @@ class PlanCache:
         if self.enabled:
             PLAN_CACHE.parent.mkdir(exist_ok=True)
             PLAN_CACHE.write_text(json.dumps(self.plans, indent=1, ensure_ascii=False))
-
-
-# ---------------------------------------------------------------------- retrieval
 
 
 def retrieval_eval(assistant: TouristAssistant, items: list[EvalItem], plans: PlanCache, k: int, verbose: bool) -> None:
@@ -127,9 +121,6 @@ def retrieval_eval(assistant: TouristAssistant, items: list[EvalItem], plans: Pl
         print(f"{mode:<8} {hit:>6.0%} {mrr:>5.2f}   {langs}")
         if verbose and misses:
             print("\n".join(misses))
-
-
-# ---------------------------------------------------------------------- answers
 
 
 JUDGE_SCHEMA: dict[str, Any] = {
@@ -224,9 +215,6 @@ def _group(items: list[EvalItem], key: Any) -> dict[str, list[EvalItem]]:
     for item in items:
         groups[key(item)].append(item)
     return groups
-
-
-# ---------------------------------------------------------------------- main
 
 
 def main(argv: list[str] | None = None) -> int:

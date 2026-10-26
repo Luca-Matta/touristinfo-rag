@@ -41,7 +41,7 @@ def clean_page(text: str) -> tuple[str, str]:
             line = drop_doubled_body(line)
             key = re.sub(r"\W+", " ", fold(line)).strip()
             if key in seen:
-                continue  # the same paragraph again further down the page
+                continue
             seen.add(key)
         out.append(line)
     return url, re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
@@ -76,7 +76,7 @@ def parse_web_file(path: Path) -> ParseResult:
             heading, body = "", section
         body = body.strip()
         if len(body) < MIN_SECTION_CHARS:
-            continue  # heading-only fragments
+            continue
         heading = heading.lstrip("# ").strip()
         result.records.append(
             Record(
