@@ -84,3 +84,13 @@ def test_missing_hours_table_is_reported_not_silent():
     place = crawl.extract(without_header, crawl.DEFAULT_URL, use_llm=False)
     assert place.opening_hours == []
     assert any("no opening-hours table" in n for n in place.notes)
+
+
+def test_http_error_stops_instead_of_parsing_the_error_page(monkeypatch):
+    class Blocked:
+        status_code = 503
+        text = "<html><h1>Service Unavailable</h1></html>"
+
+    monkeypatch.setattr(crawl, "allowed_by_robots", lambda url: True)
+    monkeypatch.setattr(crawl.requests, "get", lambda *a, **kw: Blocked())
+    assert crawl.main([crawl.DEFAULT_URL, "--no-llm"]) == 1

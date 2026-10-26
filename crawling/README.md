@@ -37,8 +37,8 @@ What validation cannot catch is a table that parses but means something else, e.
 redesign that puts an icon in every day cell, closed days included.
 
 **Polite fetching.** The crawler identifies itself, checks `robots.txt`, fetches one
-page, and falls back to headless Playwright only when the plain request fails or the page
-has no `<h1>` (rendered by JavaScript).
+page, and falls back to headless Playwright only when the page has no `<h1>` (rendered by
+JavaScript). An HTTP error is reported, not retried with a browser.
 
 **Feeds the RAG.** `--format export` renders the place in the `### BEGIN POI` format of
 `data/`, and a test checks that `rag.ingest` parses it without warnings. Two things do not
@@ -55,6 +55,7 @@ field.
 * `utm_*` tracking parameters are removed from the website link.
 
 `tests/test_crawl.py` runs the parser against a synthetic page with the same structure
-(`tests/fixtures/`), so the tests need no network. The live site returned HTTP 403 from
-the environment this was built in, so the selectors were written against the page's
-structure as published and should be checked once against the live page.
+(`tests/fixtures/`), so the tests need no network. The live site answers automated clients
+with HTTP 503, plain HTTP and headless Chromium alike, while a normal browser gets the
+page. The crawler does not try to get around that: it stops with a clear error, and
+`python crawl.py --html page.html` parses a page saved from the browser instead.

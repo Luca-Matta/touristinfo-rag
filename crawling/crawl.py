@@ -37,7 +37,7 @@ from bs4 import BeautifulSoup, Tag
 from pydantic import BaseModel, Field
 
 DEFAULT_URL = (
-    "https://www.valgardena.it/en/addresses/detail/base/company/"
+    "https://www.valgardena.it/en/addresses/detail-gastronomy/base/company/"
     "selva-di-val-gardena/bar-oswald/4206CF9CFA75D1664ECC5822E183F31B/"
 )
 USER_AGENT = "touristinfo-rag-crawler/1.0 (interview exercise; one page per run)"
@@ -100,14 +100,15 @@ def fetch_html(url: str) -> str:
     """Plain HTTP first; fall back to a headless browser if the page needs JavaScript."""
     if not allowed_by_robots(url):
         raise CrawlError(f"robots.txt disallows fetching {url}")
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT_S)
-        resp.raise_for_status()
-        if BeautifulSoup(resp.text, "html.parser").find("h1"):
-            return resp.text
-        print("[crawl] page has no <h1> (rendered by JavaScript?); trying a headless browser", file=sys.stderr)
-    except requests.RequestException as e:
-        print(f"[crawl] plain request failed ({e}); trying a headless browser", file=sys.stderr)
+    resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT_S)
+    if resp.status_code >= 400:
+        raise CrawlError(
+            f"the site answered HTTP {resp.status_code}; if the page opens in a browser, it blocks automated "
+            "clients: save it from the browser and run crawl.py --html page.html"
+        )
+    if BeautifulSoup(resp.text, "html.parser").find("h1"):
+        return resp.text
+    print("[crawl] page has no <h1> (rendered by JavaScript?); trying a headless browser", file=sys.stderr)
     return fetch_with_browser(url)
 
 
@@ -133,9 +134,12 @@ def fetch_with_browser(url: str) -> str:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(user_agent=USER_AGENT)
-        page.goto(url, wait_until="networkidle", timeout=45_000)
+        response = page.goto(url, wait_until="networkidle", timeout=45_000)
+        status = response.status if response else None
         html: str = page.content()
         browser.close()
+    if status is not None and status >= 400:
+        raise CrawlError(f"the site answered HTTP {status} to the headless browser")
     return html
 
 
