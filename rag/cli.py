@@ -33,9 +33,9 @@ def print_debug(answer: Answer) -> None:
     print("---\n", file=sys.stderr)
 
 
-def run(assistant: TouristAssistant, question: str, history: list[Message], args: argparse.Namespace) -> None:
+def run(assistant: TouristAssistant, question: str, history: list[Message], *, debug: bool) -> None:
     answer = assistant.ask(question, history)
-    if args.debug or answer.text is None:
+    if debug or answer.text is None:
         print_debug(answer)
     if answer.text is not None:
         print(answer.text)
@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     history: list[Message] = []
     if args.question:
         try:
-            run(assistant, " ".join(args.question), history, args)
+            run(assistant, " ".join(args.question), history, debug=args.debug)
         except RagError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
@@ -83,6 +83,6 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if question:
             try:
-                run(assistant, question, history, args)
+                run(assistant, question, history, debug=args.debug)
             except RagError as exc:
                 print(f"error: {exc}", file=sys.stderr)

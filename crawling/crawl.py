@@ -134,7 +134,7 @@ def fetch_with_browser(url: str) -> str:
         browser = p.chromium.launch()
         page = browser.new_page(user_agent=USER_AGENT)
         page.goto(url, wait_until="networkidle", timeout=45_000)
-        html = page.content()
+        html: str = page.content()
         browser.close()
     return html
 

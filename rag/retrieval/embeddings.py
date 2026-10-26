@@ -19,10 +19,10 @@ class Embedder(Protocol):
 class OpenAIEmbedder:
     """``text-embedding-3-small`` by default: multilingual, cheap ($0.02 / 1M tokens)."""
 
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, timeout_s: float) -> None:
         from openai import OpenAI
 
-        self.client = OpenAI()
+        self.client = OpenAI(timeout=timeout_s, max_retries=2)
         self.name = model
 
     def embed(self, texts: list[str]) -> list[list[float]]:
@@ -56,7 +56,7 @@ class LocalEmbedder:
 def make_embedder(settings: Settings) -> Embedder:
     match settings.embedding_provider:
         case "openai":
-            return OpenAIEmbedder(settings.openai_embedding_model)
+            return OpenAIEmbedder(settings.openai_embedding_model, settings.request_timeout_s)
         case "local":
             return LocalEmbedder()
     raise ConfigError(f"Unknown EMBEDDING_PROVIDER '{settings.embedding_provider}' (use openai or local)")

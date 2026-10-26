@@ -83,7 +83,7 @@ class TouristAssistant:
     def plan(self, question: str, history: Sequence[Message] = (), now: datetime | None = None) -> QueryPlan:
         if self.planner is None:
             return trivial_plan(question)
-        return self.planner.plan(question, list(history), now or self.now())
+        return self.planner.plan(question, list(history)[-HISTORY_MESSAGES:], now or self.now())
 
     def retrieve(self, plan: QueryPlan, mode: Mode = "hybrid") -> tuple[list[Record], list[RecordHit]]:
         """Pick the sources for a plan: structured matches first, then search results."""

@@ -19,7 +19,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import re
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -30,20 +30,13 @@ from .models import CATEGORY_LABELS, LANGUAGES, Category, Language
 log = logging.getLogger(__name__)
 
 PLACE_CATEGORIES = [c for c in Category if c is not Category.WEB_PAGE]
-WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
-RELATIVE_DAYS = ("today", "tomorrow", "day_after_tomorrow")
-DayRef = Literal[
-    "today",
-    "tomorrow",
-    "day_after_tomorrow",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-]
+KNOWN_CATEGORIES = frozenset(Category)
+
+RelativeDay = Literal["today", "tomorrow", "day_after_tomorrow"]
+Weekday = Literal["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+DayRef = RelativeDay | Weekday
+RELATIVE_DAYS: tuple[RelativeDay, ...] = get_args(RelativeDay)
+WEEKDAYS: tuple[Weekday, ...] = get_args(Weekday)
 
 
 def resolve_day(ref: DayRef, today: dt.date) -> dt.date:
@@ -80,7 +73,7 @@ class QueryPlan(BaseModel):
     @field_validator("categories", mode="before")
     @classmethod
     def _drop_unknown_categories(cls, v: Any) -> Any:
-        return [c for c in v if c in set(Category)] if isinstance(v, list) else v
+        return [c for c in v if c in KNOWN_CATEGORIES] if isinstance(v, list) else v
 
     @property
     def queries(self) -> list[str]:
@@ -194,9 +187,10 @@ class LLMPlanner:
         self.llm = llm
 
     def plan(self, question: str, history: list[Message], now: dt.datetime) -> QueryPlan:
+        """``history`` is used as given: the caller decides how much of it is relevant."""
         categories = "\n".join(f"  {c}: {CATEGORY_LABELS[c]['en']}" for c in PLACE_CATEGORIES)
         system = PLANNER_SYSTEM.format(categories=categories, now=f"{now:%A %Y-%m-%d %H:%M}")
-        transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history[-6:])
+        transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history)
         prompt = (f"Conversation so far:\n{transcript}\n\n" if transcript else "") + f"Latest message: {question}"
         try:
             data = self.llm.complete(system, [{"role": "user", "content": prompt}], schema=PLAN_SCHEMA).json()

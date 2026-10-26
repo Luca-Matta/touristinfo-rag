@@ -49,10 +49,10 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.11"
-packages = ["rag"]
+files = ["rag", "eval", "crawling/crawl.py"]
 strict = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["rank_bm25"]
+module = ["rank_bm25", "playwright.*"]
 ignore_missing_imports = true

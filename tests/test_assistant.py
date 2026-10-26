@@ -1,4 +1,4 @@
-from rag.assistant import MAX_SOURCES, TouristAssistant
+from rag.assistant import HISTORY_MESSAGES, MAX_SOURCES, TouristAssistant
 from rag.generation.prompts import SYSTEM_PROMPT
 from rag.models import Category
 from rag.planner import LLMPlanner, QueryPlan
@@ -75,3 +75,12 @@ def test_list_all_includes_every_place_of_the_category(corpus, retriever, settin
     )
     assert {r.id for r in corpus.places([Category.CHURCH])} <= {r.id for r in sources}
     assert len(sources) <= MAX_SOURCES
+
+
+def test_planner_sees_only_recent_history(corpus, retriever, settings):
+    planner_llm = FakeChat(plan())
+    assistant = TouristAssistant(corpus, retriever, settings, FakeChat("ok"), LLMPlanner(planner_llm))
+    history = [{"role": "user", "content": f"turn {n}"} for n in range(HISTORY_MESSAGES + 2)]
+    assistant.ask("and now?", history, now=MONDAY_10AM)
+    prompt = planner_llm.calls[0]["messages"][0]["content"]
+    assert "turn 1\n" not in prompt and f"turn {HISTORY_MESSAGES + 1}" in prompt

@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import anthropic
+import openai
+
 
 class RagError(Exception):
     """Base class: anything raised as a RagError has a message fit for the user."""
@@ -31,17 +34,13 @@ def provider_errors(what: str) -> Iterator[None]:
 
 
 def _describe(exc: Exception) -> str | None:
-    for module in ("openai", "anthropic"):
-        try:
-            sdk = __import__(module)
-        except ImportError:
-            continue
-        if isinstance(exc, sdk.AuthenticationError):
+    match exc:
+        case openai.AuthenticationError() | anthropic.AuthenticationError():
             return "the API key was rejected (check .env)"
-        if isinstance(exc, sdk.RateLimitError):
+        case openai.RateLimitError() | anthropic.RateLimitError():
             return "rate limit or quota exceeded, try again later"
-        if isinstance(exc, sdk.APIConnectionError):
+        case openai.APIConnectionError() | anthropic.APIConnectionError():
             return "could not reach the API (network problem or timeout)"
-        if isinstance(exc, sdk.APIStatusError):
+        case openai.APIStatusError() | anthropic.APIStatusError():
             return f"the API returned HTTP {exc.status_code}: {exc.message}"
     return None

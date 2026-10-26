@@ -33,7 +33,7 @@ python app.py --debug "Ist das Museum Ladin am Montag geöffnet?"   # plan + sou
 python app.py                                                      # chat, follow-ups work
 python app.py --retrieve-only "Falkenau"                           # no API key needed
 
-pytest                                          # 79 offline tests
+pytest                                          # 80 offline tests
 python -m eval.run_eval retrieval               # offline retrieval eval, dev split
 python -m eval.run_eval answers --judge -v      # end-to-end eval (LLM calls)
 python crawling/crawl.py                        # bonus, see crawling/README.md
@@ -133,7 +133,7 @@ citations, and to say so when the answer is missing. It contains nothing per-req
 off once the prompt grows (with Anthropic it would also need a `cache_control` marker).
 
 **Small, swappable parts.** `Embedder` and `ChatModel` are protocols; the tests use a
-hash embedder and a scripted fake LLM, so all 79 tests run offline in under a second.
+hash embedder and a scripted fake LLM, so all 80 tests run offline in under a second.
 SDK exceptions become a `ProviderError` with a readable message. Settings are read once,
 explicitly, from the environment; an unknown provider, a `TOP_K` that is not a positive
 integer or an unknown `TIMEZONE` fails at start-up. `ruff`, `mypy

@@ -32,7 +32,7 @@ import json
 import re
 import sys
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from pathlib import Path
 from statistics import mean
@@ -46,6 +46,7 @@ from rag.assistant import TouristAssistant
 from rag.config import Settings
 from rag.errors import RagError
 from rag.generation import ChatModel, Message, make_chat_model
+from rag.generation.prompts import LANGUAGE_NAMES, format_sources
 from rag.ingest.text import fold
 from rag.models import Language
 from rag.planner import PLANNER_SYSTEM, QueryPlan, trivial_plan
@@ -197,8 +198,8 @@ def _pattern(spelling: str) -> re.Pattern[str]:
 
 
 def answers_eval(assistant: TouristAssistant, items: list[EvalItem], judge_model: str | None, verbose: bool) -> None:
-    from rag.generation.prompts import LANGUAGE_NAMES, format_sources
-
+    if assistant.llm is None:
+        raise RagError("answers mode needs an LLM: set an API key in .env")
     tz = assistant.settings.timezone
     judge_llm = _judge(assistant.settings, judge_model) if judge_model else None
     out = HERE / ".cache" / f"answers-{datetime.now():%Y%m%d-%H%M%S}.jsonl"
@@ -207,8 +208,7 @@ def answers_eval(assistant: TouristAssistant, items: list[EvalItem], judge_model
     for item in items:
         now = item.moment(tz)
         answer = assistant.ask(item.question, item.history, now=now)
-        if answer.text is None:
-            raise RagError("answers mode needs an LLM: set an API key in .env")
+        assert answer.text is not None
         row: dict[str, Any] = {
             "id": item.id,
             "lang": item.lang,
@@ -251,8 +251,9 @@ def answers_eval(assistant: TouristAssistant, items: list[EvalItem], judge_model
 
 
 def _judge(settings: Settings, model: str) -> ChatModel:
-    field = "anthropic_model" if settings.llm_provider == "anthropic" else "openai_chat_model"
-    return make_chat_model(dataclasses.replace(settings, **{field: model}))
+    if settings.llm_provider == "anthropic":
+        return make_chat_model(dataclasses.replace(settings, anthropic_model=model))
+    return make_chat_model(dataclasses.replace(settings, openai_chat_model=model))
 
 
 def _print_row(row: dict[str, Any]) -> None:
@@ -270,7 +271,7 @@ def _print_row(row: dict[str, Any]) -> None:
     print(f"{row['id']} [{row['lang']}] {row['question']}\n    {status}")
 
 
-def _group(items: list[EvalItem], key: Any) -> dict[str, list[EvalItem]]:
+def _group(items: list[EvalItem], key: Callable[[EvalItem], str]) -> dict[str, list[EvalItem]]:
     groups: dict[str, list[EvalItem]] = defaultdict(list)
     for item in items:
         groups[key(item)].append(item)
