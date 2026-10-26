@@ -182,29 +182,34 @@ tourist office, a detail about Bolzano station). The fact checks had passed by
 coincidence (a "5" inside a phone number), and the judge was the answering model, seeing
 only the retrieved sources. The checks and the judge described above are the response.
 
-With them (all 69 questions, `gpt-4.1-mini` answering, `gpt-4.1` judging):
+With them (all 69 questions, `gpt-4.1-mini` answering, `gpt-4.1` judging), before and
+after tightening the answer prompt:
 
-| check | result |
-| --- | --- |
-| an expected source among the sources | 100% |
-| all required facts in the answer | 99% |
-| no forbidden phrase | 100% |
-| judge: grounded | 72% |
-| judge: correct | 88% |
-| judge: complete | 94% |
-| judge: answered in the guest's language | 100% |
-| judge: all four checks | 71% |
+| check | first run | prompt tightened |
+| --- | --- | --- |
+| an expected source among the sources | 100% | 100% |
+| all required facts in the answer | 99% | 99% |
+| no forbidden phrase | 100% | 100% |
+| judge: grounded | 72% | 83% |
+| judge: correct | 88% | 94% |
+| judge: complete | 94% | 91% |
+| judge: answered in the guest's language | 100% | 100% |
+| judge: all four checks | 71% | 77% |
 
-Retrieval was never the problem: every failure is in the answer. Most are embellishment
-(praise and adjectives the sources do not use: "excellent bakeries", "beautiful
-countryside"), a few are real errors: Vanea's breakfast still presented as included
-(q22), Ehrenburg castle called "private property" (q40), a phone number credited to the
-tourist office (q51), lifts at Bolzano station (q57), Market Engl's afternoon hours left
-out (q02). The answer prompt now says to keep qualifiers, add no praise, credit contact
-details only to their own place and give every opening interval. Those rules were
-written after reading these failures, so the next dev numbers will flatter it; the test
-split is the fairer check. The judge is also strict to the point of pedantry (it fails
-q35 for its citation style), so read its issues, not just its percentages.
+Retrieval was never the problem: every failure is in the answer. In the first run most
+were embellishment (praise and adjectives the sources do not use: "excellent bakeries",
+"beautiful countryside"), a few were real errors: Vanea's breakfast presented as included
+(q22), Ehrenburg castle called "private property" (q40), lifts at Bolzano station (q57),
+Market Engl's afternoon hours left out (q02). The answer prompt now says to keep
+qualifiers, add no praise, credit contact details only to their own place and give every
+opening interval, and those four are fixed. What remains is mostly the judge being
+strict to the point of pedantry ("honeydew honey", "lecker", a hike "suitable for
+families" when the source says "family walk") plus two real slips: bus rules applied to
+trains (q55) and a church's phone number offered as the way to get the key (q51).
+
+The prompt rules were written after reading these failures, so the second column
+flatters the prompt; the 23 test questions are the fairer check, and one run is one
+sample. The full per-question issues are in `eval/.cache/answers-*.jsonl`.
 
 **How the eval changed the code.** The first run with a key showed four misses: the
 planner appended "in Kiens/Chienes" to most queries, and since every source mentions the
