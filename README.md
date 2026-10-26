@@ -33,7 +33,7 @@ python app.py --debug "Ist das Museum Ladin am Montag geöffnet?"   # plan + sou
 python app.py                                                      # chat, follow-ups work
 python app.py --retrieve-only "Falkenau"                           # no API key needed
 
-pytest                                          # 50 offline tests
+pytest                                          # 51 offline tests
 python -m eval.run_eval retrieval               # offline retrieval eval, dev split
 python -m eval.run_eval answers --judge -v      # end-to-end eval (LLM calls)
 python crawling/crawl.py                        # bonus, see crawling/README.md
@@ -123,7 +123,7 @@ citations, and to say so when the answer is missing. It contains nothing per-req
 (time and sources go in the user turn), so it is byte-identical and cacheable.
 
 **Small, swappable parts.** `Embedder` and `ChatModel` are protocols; the tests use a
-hash embedder and a scripted fake LLM, so all 50 tests run offline in under a second.
+hash embedder and a scripted fake LLM, so all 51 tests run offline in under a second.
 SDK exceptions become a `ProviderError` with a readable message. Settings are read once,
 explicitly, from the environment, and invalid values fail at start-up. `ruff`, `mypy
 --strict` and the tests run in CI together with the offline retrieval eval.
@@ -142,21 +142,43 @@ into `dev` (46, inspect and tune) and `test` (23, only report).
 * `eval.run_eval answers` runs the whole pipeline and checks the required facts;
   `--judge` adds an LLM judge for groundedness, correctness and answer language.
 
-Offline retrieval, local English-only MiniLM, no planner, k = 5:
+**Retrieval**, hit@5 / MRR over the 67 questions with an expected source:
 
-| mode | dev hit@5 | dev MRR | test hit@5 | test MRR |
-| --- | --- | --- | --- | --- |
-| dense | 89% | 0.76 | 86% | 0.71 |
-| keyword | 87% | 0.84 | 86% | 0.80 |
-| **hybrid** | **93%** | **0.86** | **100%** | **0.83** |
+| configuration | dense | keyword | **hybrid** |
+| --- | --- | --- | --- |
+| offline: local MiniLM, raw question | 84% / 0.71 | 87% / 0.83 | **96% / 0.85** |
+| OpenAI embeddings + planner | 100% / 0.99 | 100% / 0.98 | **100% / 0.99** |
 
-The retrievers fail on different questions (BM25 does not know "Brot", MiniLM does not
-understand Italian), which is why fusion helps. The three remaining dev misses are the
-cases the planner exists for: two follow-ups ("Is it open on Sunday?") and one purely
-cross-lingual question. Those numbers, and the answer-level ones, need an API key and
-have not been measured in this repository yet; run the two commands above with a key to
-fill them in. With 69 questions one question moves a score by 1.5 to 4.5 points, so treat
-small differences as noise.
+Offline, the retrievers fail on different questions (BM25 does not know "Brot", MiniLM
+does not understand Italian), which is why fusion helps; the remaining misses are
+follow-ups and cross-lingual questions, the cases the planner exists for.
+
+**Answers** (OpenAI embeddings, `gpt-4.1-mini` for planner, answers and judge), dev split:
+
+| check | result |
+| --- | --- |
+| an expected source among the sources | 46/46 |
+| all required facts in the answer | 46/46 |
+| judge: grounded in the sources | 46/46 |
+| judge: correct (incl. "not in the data" for unanswerable) | 46/46 |
+| judge: answered in the guest's language | 46/46 |
+
+`python -m eval.run_eval answers --judge --split test` reports the held-out split.
+
+**How the eval changed the code.** The first run with a key showed four misses: the
+planner appended "in Kiens/Chienes" to every query, and since every source mentions the
+area, that phrase diluted both retrievers. The planner now adds nothing the guest did not
+write. The answer eval then showed one question answered with "no information" although
+dense search had found the page: BM25 over the Italian phrasing produced noise lists that
+outvoted it, so keyword search now uses the English rewrite only.
+
+**Read these numbers with care.** Those fixes were found by looking at misses across all
+questions, so the test split is no longer untouched, and at 100% the set is saturated: it
+can catch regressions but not show further improvement. One question moves a score by
+1.5 to 4.5 points. The judge is the same model that answers and only sees the retrieved
+sources, so it cannot tell that "the sources don't say" was wrong when retrieval missed;
+the `source retrieved` and fact checks cover that case. A credible benchmark would need
+questions written by others or taken from real guest logs.
 
 ## Limitations and next steps
 
