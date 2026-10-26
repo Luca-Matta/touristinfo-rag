@@ -129,7 +129,7 @@ their content HTML-escaped, so a scraped page cannot close its tag and pose as
 instructions. The system prompt asks for answers only from the sources, with `[n]`
 citations, and to say so when the answer is missing. It contains nothing per-request
 (time and sources go in the user turn), so it is byte-identical across requests. At about
-250 tokens it is still below the providers' minimum for prompt caching; the layout pays
+400 tokens it is still below the providers' minimum for prompt caching; the layout pays
 off once the prompt grows (with Anthropic it would also need a `cache_control` marker).
 
 **Small, swappable parts.** `Embedder` and `ChatModel` are protocols; the tests use a
@@ -180,8 +180,31 @@ church open and then St. Martin locked), four were imprecise or unsupported (pra
 the bakeries, Market Engl without its afternoon hours, a phone number credited to the
 tourist office, a detail about Bolzano station). The fact checks had passed by
 coincidence (a "5" inside a phone number), and the judge was the answering model, seeing
-only the retrieved sources. The checks and the judge described above are the response;
-`python -m eval.run_eval answers --judge --split all` gives the current numbers.
+only the retrieved sources. The checks and the judge described above are the response.
+
+With them (all 69 questions, `gpt-4.1-mini` answering, `gpt-4.1` judging):
+
+| check | result |
+| --- | --- |
+| an expected source among the sources | 100% |
+| all required facts in the answer | 99% |
+| no forbidden phrase | 100% |
+| judge: grounded | 72% |
+| judge: correct | 88% |
+| judge: complete | 94% |
+| judge: answered in the guest's language | 100% |
+| judge: all four checks | 71% |
+
+Retrieval was never the problem: every failure is in the answer. Most are embellishment
+(praise and adjectives the sources do not use: "excellent bakeries", "beautiful
+countryside"), a few are real errors: Vanea's breakfast still presented as included
+(q22), Ehrenburg castle called "private property" (q40), a phone number credited to the
+tourist office (q51), lifts at Bolzano station (q57), Market Engl's afternoon hours left
+out (q02). The answer prompt now says to keep qualifiers, add no praise, credit contact
+details only to their own place and give every opening interval. Those rules were
+written after reading these failures, so the next dev numbers will flatter it; the test
+split is the fairer check. The judge is also strict to the point of pedantry (it fails
+q35 for its citation style), so read its issues, not just its percentages.
 
 **How the eval changed the code.** The first run with a key showed four misses: the
 planner appended "in Kiens/Chienes" to most queries, and since every source mentions the
