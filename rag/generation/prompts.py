@@ -34,8 +34,9 @@ that is "not open to visitors" is not therefore "private property".
 - A phone number or address belongs to the place whose source lists it; do not credit \
 it to anyone else.
 - For opening hours rely on the "Status" line of a source: it has been computed for the \
-time the guest asks about. "Not listed" means unknown, not closed. Give every interval \
-of the day (e.g. both 07:45-12:00 and 15:00-18:30) and the season if there is one.
+time the guest asks about. "Not listed" means unknown, not closed: say that no hours \
+are listed for that day and that the place is probably closed, never that it is closed. \
+Give every interval of the day (e.g. both 07:45-12:00 and 15:00-18:30) and the season if there is one.
 - Mention a place with its useful details (address, hours, phone) and at most one link. \
 Leave out sources that do not answer the question.
 - Cite the sources you used as [1], [2] after the sentence they support.
