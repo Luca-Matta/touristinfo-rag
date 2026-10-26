@@ -39,7 +39,7 @@ from rag.errors import RagError
 from rag.generation import Message, make_chat_model
 from rag.ingest.text import fold
 from rag.models import Language
-from rag.planner import QueryPlan, trivial_plan
+from rag.planner import PLANNER_SYSTEM, QueryPlan, trivial_plan
 
 HERE = Path(__file__).parent
 QUESTIONS = HERE / "questions.json"
@@ -83,7 +83,7 @@ class PlanCache:
         if not self.enabled:
             return trivial_plan(item.question)
         assert self.assistant.planner is not None
-        key_src = json.dumps([self.assistant.planner.llm.name, item.question, item.history, item.now])
+        key_src = json.dumps([PLANNER_SYSTEM, self.assistant.planner.llm.name, item.question, item.history, item.now])
         key = hashlib.sha256(key_src.encode()).hexdigest()[:16]
         if key not in self.plans:
             plan = self.assistant.plan(item.question, item.history, item.moment(tz))

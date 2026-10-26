@@ -99,15 +99,18 @@ PLANNER_SYSTEM = """\
 You prepare searches for a tourist information chatbot about Kiens/Chienes (South Tyrol).
 Given the conversation and the guest's latest message, return JSON:
 - standalone_question: the latest message rewritten so it is understandable without the \
-conversation, in the guest's language.
+conversation, in the guest's language. Only resolve references; add nothing else.
 - english_query: a concise English search query for the same need (names of places unchanged).
+  Never add the destination name (Kiens/Chienes) or other places the guest did not mention: \
+every source is about the area, so it only dilutes the search.
 - language: the language of the latest message (en, de, it, or other).
 - categories: place categories the guest asks about; empty if none or unsure. Options:
 {categories}
 - date / time: only if the guest asks about a specific day or time (resolve "tomorrow", \
 "on Sunday", "tonight" relative to the current time below); otherwise null.
 - services: facilities the guest requires, as short English terms matching typical \
-accommodation services (e.g. "sauna", "dogs allowed", "indoor pool"); empty if none.
+accommodation services (e.g. "sauna", "dogs allowed", "indoor pool"); empty if none \
+or if the guest is not looking for a place to stay or eat.
 - list_all: true if the guest wants all places of a category (e.g. "list all churches").
 
 Current local time: {now}"""

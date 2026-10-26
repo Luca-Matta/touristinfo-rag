@@ -67,9 +67,9 @@ CATEGORY_LABELS: dict[Category, dict[Language, str]] = {
         "it": "macelleria, salumeria",
     },
     Category.CASTLE: {
-        "en": "castle, palace",
-        "de": "Burg, Schloss",
-        "it": "castello",
+        "en": "castle, palace, museum",
+        "de": "Burg, Schloss, Museum",
+        "it": "castello, museo",
     },
     Category.CHURCH: {
         "en": "church, chapel",
