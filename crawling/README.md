@@ -26,8 +26,10 @@ template description is built from the extracted fields.
 
 **Selectors are structural, not cosmetic.** No CSS class names: `tel:` and `mailto:`
 links, the contact block (the smallest element around the phone link that also contains
-a postcode line), tables whose header row is `Mo Tu We Th Fr Sa Su`, the
-`#c_..._container` section anchors, route-planner links with `toLat`/`toLon`.
+a postcode line), tables whose header row is `Mo Tu We Th Fr Sa Su`, the text under the
+"Description" heading, route-planner links with `toLat`/`toLon`. Checked against the live
+page saved from a browser: name, category, hours, contact, coordinates and description
+all come out right.
 
 **Validated output.** Times must be `HH:MM`, weekdays are an enum, coordinates are range
 checked, so a value that is extracted is well-formed. A selector that finds nothing is a

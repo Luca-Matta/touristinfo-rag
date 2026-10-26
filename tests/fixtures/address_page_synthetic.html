@@ -1,16 +1,20 @@
 <!doctype html>
 <!-- SYNTHETIC fixture modelled on the structure of a valgardena.it address page
-     (h1, contact block with tel:/Cloudflare-protected email, one table per opening period).
+     (h1, generic og:title, description in its own wrapper, contact block with tel:/Cloudflare-protected
+     email, one table per opening period).
      Values are fake. Used only by tests/test_crawl.py. -->
 <html><head>
 <title>Après Ski: Example Bar - Selva di Val Gardena</title>
 <meta name="description" content="Après-ski, snack point, terrace">
+<meta property="og:title" content="Detail Gastronomy  in Val Gardena - Dolomites">
 </head><body>
 <nav><a href="/en/">Home</a></nav>
 <h1>Example Bar</h1>
-<div id="c_description_container"><h2>Description</h2>
-  <p>Pub, Cocktails, Beer, sandwiches, sun terrace, music</p></div>
-<div id="c_opening_times_container"><h2>opening times</h2>
+<div class="articledata">
+  <div class="articleheader"><h2 class="medium">Description</h2></div>
+  <div class="articlecontent">Pub, Cocktails, Beer, sandwiches, sun terrace, music</div>
+</div>
+<div class="articledata"><h2>opening times</h2>
   <table>
     <tr><th>01.06.2026 - 30.09.2026</th><th>Mo</th><th>Tu</th><th>We</th><th>Th</th><th>Fr</th><th>Sa</th><th>Su</th></tr>
     <tr><td>06:00 - 22:00</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>

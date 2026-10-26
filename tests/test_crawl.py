@@ -56,7 +56,10 @@ def test_implausible_period_is_flagged():
 
 
 def test_template_description_without_llm():
-    assert PLACE.description.startswith("Example Bar is an après ski venue in Selva di Val Gardena.")
+    assert PLACE.description == (
+        "Example Bar is an après ski venue in Selva di Val Gardena. "
+        "It offers pub, cocktails, beer, sandwiches, sun terrace, music."
+    )
 
 
 def test_cfemail_decoder():
