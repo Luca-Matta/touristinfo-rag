@@ -1,169 +1,172 @@
-# touristinfo.ai — minimal RAG pipeline for a tourist chatbot
+# touristinfo.ai: a multilingual RAG assistant for Kiens/Chienes
 
-A small, end-to-end Retrieval-Augmented Generation pipeline over the Kiens/Chienes
-tourism corpus in `data/` (12 export files: B&Bs, hikes, bakeries, butchers, castles,
-churches, pizzerias and five scraped web pages, with names and links in EN/DE/IT).
+A retrieval-augmented chatbot over the Kiens/Chienes tourism corpus in `data/` (seven
+structured exports: B&Bs, hikes, bakeries, butchers, castles, churches, pizzerias, plus
+five scraped web pages). Guests ask in English, German or Italian, the corpus is mostly
+English. Plus the bonus crawler in `crawling/`.
 
 ```
-question ──► hybrid retrieval ──────────────► prompt with numbered sources ──► LLM ──► answer
-             ├─ dense: Chroma (cosine)          + "open right now" computed      (OpenAI or
-             └─ keyword: BM25                     in code from opening hours      Anthropic)
-             fused with reciprocal rank fusion
+guest message + history
+   │
+   ▼
+query planner (1 small LLM call, JSON schema)
+   standalone question · English query · language · categories · date/time · services · "list all"
+   │
+   ▼
+hybrid retrieval: Chroma (cosine) + BM25, over both phrasings, fused per record with RRF
+   + structured matches: places offering every requested service, every place of a category
+   │
+   ▼
+answer LLM: static system prompt + history + <source> blocks
+   (opening status computed in code for the moment asked about, link in the guest's language)
 ```
 
 ## Quick start
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env            # add OPENAI_API_KEY and/or ANTHROPIC_API_KEY
+pip install -r requirements.txt          # = pip install -e ".[crawl,dev]"
+cp .env.example .env                     # add OPENAI_API_KEY and/or ANTHROPIC_API_KEY
 
 python app.py "Where can I buy bread on Saturday afternoon?"
-python app.py "Ist das ladinische Museum am Montag geöffnet?"
-python app.py --debug "Dove posso mangiare una pizza?"   # shows chunks, scores and the prompt
-python app.py                                            # interactive chat
-python app.py --retrieve-only "Falkenau"                 # no API key needed
+python app.py --debug "Ist das Museum Ladin am Montag geöffnet?"   # plan + sources with ranks
+python app.py                                                      # chat, follow-ups work
+python app.py --retrieve-only "Falkenau"                           # no API key needed
 
-python -m eval.run_eval -v      # retrieval eval: dense vs keyword vs hybrid
-python -m pytest -q             # unit tests (offline)
-
-python crawling/crawl.py        # bonus: Bar Oswald page -> JSON (see crawling/README.md)
+pytest                                          # 50 offline tests
+python -m eval.run_eval retrieval               # offline retrieval eval, dev split
+python -m eval.run_eval answers --judge -v      # end-to-end eval (LLM calls)
+python crawling/crawl.py                        # bonus, see crawling/README.md
 ```
 
-The index is built on first run and stored in `.chroma/`. It is rebuilt automatically
-when the corpus or the embedding model changes (a content hash is kept on the collection).
+The vector index is built on first run in `.chroma/` and rebuilt automatically when the
+chunks or the embedding model change (a content hash is stored on the collection).
 
-**Providers.** With `OPENAI_API_KEY` set, embeddings use `text-embedding-3-small`
-(multilingual) and answers use `gpt-4.1-mini`. With only `ANTHROPIC_API_KEY`, answers use
-Claude (`claude-opus-5-5`) and embeddings fall back to Chroma's local MiniLM model
-(Anthropic has no embeddings API). Everything is overridable in `.env`
-(see `.env.example`).
+**Providers.** With `OPENAI_API_KEY`, embeddings use `text-embedding-3-small`
+(multilingual) and the LLM is `gpt-4.1-mini`. With only `ANTHROPIC_API_KEY`, the LLM is
+Claude (`claude-opus-5-5`, low effort) and embeddings use Chroma's local MiniLM model,
+since Anthropic has no embeddings API. Without any key the app runs retrieval only.
+Everything can be overridden in `.env`, including a cheaper `PLANNER_MODEL`.
 
-## Project layout
+**Cost.** A question is two LLM calls: the planner (~600 input tokens) and the answer
+(~2-4k input tokens of sources). With `gpt-4.1-mini` that is roughly $0.002 per question;
+indexing the whole corpus with OpenAI embeddings costs well under one cent.
 
-| File | What it does |
+## Layout
+
+| Path | Responsibility |
 | --- | --- |
-| `rag/corpus.py` | Parses the exports into records, cleans the web pages, builds chunks |
-| `rag/hours.py` | Parses opening hours, renders them, computes open/closed at a given time |
-| `rag/retrieval.py` | Embeddings, Chroma collection, BM25, rank fusion |
-| `rag/generation.py` | System prompt, context formatting, OpenAI / Anthropic clients |
-| `rag/pipeline.py` | Wires it together: `RagPipeline().answer(question)` |
-| `app.py` | CLI (single question, interactive, `--debug`, `--retrieve-only`) |
-| `eval/` | 33 labelled questions (EN/DE/IT) and a retrieval evaluation script |
-| `tests/` | Offline unit tests for parsing, hours logic, retrieval and the crawler |
-| `crawling/` | Bonus exercise: `crawl.py` extracts a destination page into JSON ([details](crawling/README.md)) |
+| `rag/models.py` | `Record` (one thing a guest can ask about), `Category` with EN/DE/IT labels |
+| `rag/ingest/` | Table-driven parser for the exports, web-page cleaner, `Corpus` with structured lookups |
+| `rag/hours.py` | Opening hours: parse, describe, status at a moment (`OPEN`/`CLOSED`/`NOT_LISTED`/`OUT_OF_SEASON`) |
+| `rag/chunking.py` | Record-level chunks, split by paragraph/sentence only when too long |
+| `rag/retrieval/` | `Embedder` protocol, Chroma store, BM25 index, RRF, `HybridRetriever` |
+| `rag/planner.py` | `QueryPlan` (pydantic) and the LLM planner with a strict JSON schema |
+| `rag/generation/` | `ChatModel` protocol (OpenAI, Anthropic, logging decorator), prompts |
+| `rag/assistant.py` | `TouristAssistant.ask()`: plan, retrieve, select sources, answer |
+| `rag/cli.py`, `app.py` | Command line chat |
+| `eval/` | 69 labelled questions (dev/test), retrieval and answer evaluation |
+| `tests/` | Offline tests: a hash embedder and a scripted fake LLM stand in for the APIs |
+| `crawling/` | Bonus: destination page to validated JSON or to the export format |
 
-## What the data looks like, and what that implies
+## What the data implies
 
-Reading the corpus before writing code shaped most of the decisions:
+Reading the corpus first shaped most decisions:
 
-1. **The structured exports are already split into entities.** Each record sits between
-   `### BEGIN POI|ACCOMMODATION|ACTIVITY|RESTAURANT` markers and is small (under 3 kB).
-   So chunks follow records instead of fixed-size windows: a fixed window would cut
-   "Opening hours" away from the name of the place they belong to. Only the two longest
-   records are split, by paragraph, and every part repeats the record's title line.
-2. **Opening hours are Python dict literals** (`{'period_start': '01.05', ..., 'days':
-   ['tu', ...]}`). They are parsed with `ast.literal_eval` (safe, literals only), rendered
-   as `Tue-Sun 10:00-18:00; closed Mon (from 01.05 to 05.11)`, and kept as JSON metadata.
-   At question time the code computes `Status right now: closed now; opens tomorrow at
-   10:00` and puts it in the prompt. LLMs are unreliable at weekday and date arithmetic,
-   so that part is done in code.
-3. **Three languages, but mostly English text.** Descriptions are English. German and
-   Italian appear only in "Also known as" names and in link slugs, while guests ask in all
-   three languages. To bridge this, each record chunk carries its DE/IT names plus a
-   category label in all three languages (`Bakery · Bäckerei / Konditorei · panificio /
-   panetteria`). Embeddings default to a multilingual model, and the LLM is told to answer
-   in the guest's language and to prefer the link in that language (EN/DE/IT links are
-   kept per record).
-4. **The web scrapes are noisy.** They include cookie banners, "Read more" crumbs, a stray
-   `à` glyph, and on the churches page every paragraph body appears twice. The cleaner
-   drops the banner, the boilerplate lines and the duplicated halves/paragraphs, then
-   chunks by heading.
-5. **Small data-quality fixes.** Postcodes and house numbers like `39030.0` and
-   `Dorfweg 22.0` become `39030` and `22`. Phones like `390474565238` get a `+39` prefix,
-   a `-` placeholder phone is dropped, and the "this area" town placeholder is removed.
-   The file name typo `Bucheries` is kept as the category id but labelled "Butcher".
-6. **List questions** ("list all B&Bs", "which churches are there?") need *every* record
-   of a category, which top-k does not guarantee. Each category therefore gets one
-   overview chunk naming all its entries. Its text reuses the file's own description and
-   example questions, which read exactly like user questions.
+1. **The exports are already split into entities**, each small. So a record is the unit:
+   one chunk per record (only records over 1,500 characters are split, and each piece
+   repeats the title line), and the LLM always receives the whole record. Fixed-size
+   windows would separate "opening hours" from the place they belong to.
+2. **Each record gets two views.** `search_text` (name, DE/IT aliases, category labels in
+   three languages, services, description) is what is embedded and keyword-indexed; URLs,
+   phone numbers and coordinates would only add noise. `context_text` is what the LLM
+   reads: every field, rendered consistently, with the detail link in the guest's language.
+3. **Opening hours are Python dict literals.** They are parsed with `ast.literal_eval`
+   (literals only, no code execution) and every "is it open?" question is answered in
+   code for the moment the guest asks about ("now", "on Sunday", "tomorrow at 8"), because
+   LLMs are unreliable at weekday and date arithmetic. The exports list the days a place
+   *is* open, so an unlisted day is reported as "no hours listed (possibly closed)" rather
+   than "closed".
+4. **Guests write in three languages, the text is English.** Three things bridge it: the
+   planner's English rewrite of every question, multilingual category labels and aliases
+   in the indexed text (so BM25 matches "Bäckerei" and "macelleria"), and multilingual
+   embeddings when OpenAI is configured.
+5. **Similarity search cannot answer every shape of question.** "Which B&B has a sauna?"
+   (every B&B looks alike) and "list all churches" (k is too small) are answered from
+   structured fields: the planner extracts `services` and `list_all`, and those matches
+   are placed first among the sources. Each category also has an overview record listing
+   all its entries.
+6. **The data is messy** and the parser says so. Unknown fields produce warnings (the
+   current corpus parses with zero), `39030.0` becomes `39030`, `390474565238` gets a
+   `+39`, placeholder towns and phones are dropped. The web scrapes lose their cookie
+   banner, "Read more" crumbs, a stray glyph and the duplicated paragraph bodies of the
+   churches page, and are split by heading.
 
 ## Design decisions
 
-**Hybrid retrieval (dense + BM25, fused with RRF).** Tourist questions mix proper nouns
-("Falkenau", "Ciastel de Tor", "Casteldarne") that keyword search nails with paraphrases
-and other-language questions that need embeddings. Reciprocal rank fusion
-(`score = Σ 1/(60 + rank)`) merges the two lists without calibrating BM25 scores against
-cosine similarity. The BM25 tokenizer lowercases, strips accents (`Schoneck` matches
-`Schöneck`) and removes EN/DE/IT stopwords. Without the stopword step, "where can I find…"
-matched the example questions inside every overview chunk. Parts of a split record count
-as one result, so a long record cannot take several of the k slots.
+**Hybrid retrieval.** Proper nouns ("Falkenau", "Ciastel de Tor") are where BM25 is
+strong; paraphrases and other languages are where embeddings are. Reciprocal rank fusion
+(`Σ 1/(60 + rank)`) merges the ranked lists without calibrating BM25 against cosine.
+Each (phrasing, retriever) pair is one list, chunks are collapsed to records inside each
+list so a split record cannot take two slots, and a category filter falls back to an
+unfiltered search when it leaves fewer than k results.
 
-**Chroma** as the vector store: embedded, persistent, zero setup. Embeddings are computed
-by our own `Embedder` class and passed in explicitly, so switching between OpenAI and the
-local model is a config change, and each model gets its own collection.
+**A planner instead of a bigger prompt.** One cheap structured-output call resolves
+follow-ups ("und am Sonntag?"), produces the English query, detects the language and
+extracts date, time, categories and services. Its output is validated with pydantic; on
+any failure the pipeline falls back to the raw question, so planning can only help.
 
-**Small-to-big context.** Retrieval works on chunks, but when one part of a split record
-matches, the LLM gets the whole record.
+**Grounding and prompt injection.** Sources are reference data in `<source>` tags with
+their content HTML-escaped, so a scraped page cannot close its tag and pose as
+instructions. The system prompt asks for answers only from the sources, with `[n]`
+citations, and to say so when the answer is missing. It contains nothing per-request
+(time and sources go in the user turn), so it is byte-identical and cacheable.
 
-**Grounded prompt.** Sources are numbered and carry their links and live opening status.
-The system prompt asks for answers only from those sources, in the guest's language, with
-`[n]` citations. When the answer is missing it should say so and point to the tourist
-office, never invent hours, phones or links. "Hours not listed" means unknown, not closed.
-The current time goes in the user turn rather than the system prompt, so the system
-prompt stays identical across requests and can be cached.
+**Small, swappable parts.** `Embedder` and `ChatModel` are protocols; the tests use a
+hash embedder and a scripted fake LLM, so all 50 tests run offline in under a second.
+SDK exceptions become a `ProviderError` with a readable message. Settings are read once,
+explicitly, from the environment, and invalid values fail at start-up. `ruff`, `mypy
+--strict` and the tests run in CI together with the offline retrieval eval.
 
-**Deliberately left out (for a ~40 minute exercise):** a UI, streaming, multi-turn memory
-and query rewriting, metadata filters, and re-ranking. See "Next steps".
+## Evaluation
 
-## Evaluation and debugging
+`eval/questions.json` holds 69 questions (29 EN, 21 DE, 19 IT) with the record ids that
+can answer them, facts the answer must contain (with accepted spellings), optional chat
+history for follow-ups, a fixed "now" (Monday 26.10.2026, 10:00) so hours answers are
+reproducible, and three questions the data cannot answer. They are split per language
+into `dev` (46, inspect and tune) and `test` (23, only report).
 
-`eval/questions.json` has 33 questions (14 EN, 10 DE, 9 IT) labelled with the source(s)
-that should be retrieved. `python -m eval.run_eval` reports hit@5 and MRR for each
-retriever on its own and for the fusion. It needs no LLM and runs in seconds. When an
-answer is wrong, this is the first thing to check: if retrieval missed, no prompt will
-fix it.
+* `eval.run_eval retrieval` reports hit@5 and MRR per retriever and language. Offline it
+  uses the raw question; `--planner` adds the LLM planning step (plans are cached in
+  `eval/.cache`, so reruns are free).
+* `eval.run_eval answers` runs the whole pipeline and checks the required facts;
+  `--judge` adds an LLM judge for groundedness, correctness and answer language.
 
-Results with the **offline** MiniLM embedder (English-only model), k = 5:
+Offline retrieval, local English-only MiniLM, no planner, k = 5:
 
-| mode | hit@5 | MRR | EN | DE | IT |
-| --- | --- | --- | --- | --- | --- |
-| dense (MiniLM) | 88% | 0.78 | 14/14 | 9/10 | 6/9 |
-| keyword (BM25) | 88% | 0.80 | 14/14 | 8/10 | 7/9 |
-| **hybrid** | **97%** | **0.85** | 14/14 | 10/10 | 8/9 |
+| mode | dev hit@5 | dev MRR | test hit@5 | test MRR |
+| --- | --- | --- | --- | --- |
+| dense | 89% | 0.76 | 86% | 0.71 |
+| keyword | 87% | 0.84 | 86% | 0.80 |
+| **hybrid** | **93%** | **0.86** | **100%** | **0.83** |
 
-The two retrievers fail on different questions. BM25 misses "Wo bekomme ich frisches
-Brot?" because "Brot" is not in the corpus. MiniLM misses "Castello di Casteldarne"
-because it does not understand Italian. The fusion recovers both. The remaining miss
-("Posso viaggiare in treno con la sedia a rotelle?") is purely cross-lingual: no Italian
-word in it appears in the English page. That is what the multilingual OpenAI embeddings
-are for (rerun `python -m eval.run_eval` with `OPENAI_API_KEY` set to compare).
-
-How these numbers moved during development (the debugging trail):
-
-* Raw opening-hours dicts were first embedded verbatim, and the parser silently missed
-  them because `**Opening Hours for X:**` also matched the record-title pattern.
-  Checking the rendered chunks caught it, and a test now guards it.
-* BM25 initially ranked every overview chunk high for any "where can I…" question.
-  Fixed with stopwords.
-* A long record used two of the five slots. Fixed by grouping chunk parts per record
-  inside the fusion, which took hybrid from 94% to 97%.
-
-`python app.py --debug "..."` prints each retrieved chunk with its RRF score and its rank
-in each retriever, followed by the exact prompt sent to the LLM.
+The retrievers fail on different questions (BM25 does not know "Brot", MiniLM does not
+understand Italian), which is why fusion helps. The three remaining dev misses are the
+cases the planner exists for: two follow-ups ("Is it open on Sunday?") and one purely
+cross-lingual question. Those numbers, and the answer-level ones, need an API key and
+have not been measured in this repository yet; run the two commands above with a key to
+fill them in. With 69 questions one question moves a score by 1.5 to 4.5 points, so treat
+small differences as noise.
 
 ## Limitations and next steps
 
-* **Answer-level evaluation:** add expected facts per question and an LLM-as-judge (or
-  string checks for hours and phones) to measure faithfulness, not only retrieval.
-* **Multi-turn chat:** rewrite follow-up questions ("and on Sunday?") into standalone
-  queries before retrieval.
-* **Metadata filtering and tools:** questions like "what is open now?" or "B&Bs that
-  allow dogs" are better answered by filtering structured fields (hours, services,
-  category) than by similarity search. A natural next step is to give the LLM a small
-  tool for that.
-* **Re-ranking** with a cross-encoder once the corpus grows beyond a few dozen chunks.
-* **Holidays and exceptions** are not in the hours data, so the "open now" status cannot
-  know about them. The prompt keeps the wording factual.
-* **Scale:** for thousands of records, swap the in-process BM25 for a search engine (or
-  Qdrant/Weaviate hybrid search) and do incremental indexing instead of rebuild-on-hash.
+* **No holidays or exceptions** in the hours data, so the computed status cannot know
+  about them; the wording stays factual ("no hours listed").
+* **Two LLM calls per question.** For latency, the planner could run on a small model
+  (`PLANNER_MODEL`) or be skipped for single-turn questions in the guest's corpus language.
+* **Service matching** is substring-based over the services list ("dogs allowed" is
+  found, "pet friendly" is not); a synonym table or embedding match would fix that.
+* **Re-ranking** with a cross-encoder becomes worth it once the corpus grows beyond a few
+  hundred records; so does a search engine with native hybrid search instead of
+  in-process BM25, and incremental indexing instead of rebuild-on-hash.
+* **Streaming** answers and a web UI were out of scope.

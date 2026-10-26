@@ -1,58 +1,68 @@
-"""Runtime settings, read from environment variables (and a local .env file)."""
+"""Runtime settings, read explicitly from the environment (see .env.example)."""
 
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, cast
 
-from dotenv import load_dotenv
+from .errors import ConfigError
 
 ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env")
 
-
-def _env(name: str, default: str) -> str:
-    return os.getenv(name, "").strip() or default
+EmbeddingProvider = Literal["openai", "local"]
+LLMProvider = Literal["openai", "anthropic"]
 
 
 @dataclass(frozen=True)
 class Settings:
     data_dir: Path = ROOT / "data"
-    chroma_dir: Path = ROOT / ".chroma"
+    index_dir: Path = ROOT / ".chroma"
+    embedding_provider: EmbeddingProvider = "local"
+    openai_embedding_model: str = "text-embedding-3-small"
+    llm_provider: LLMProvider | None = None  # None: retrieval only
+    openai_chat_model: str = "gpt-4.1-mini"
+    anthropic_model: str = "claude-opus-5-5"
+    planner_model: str | None = None  # defaults to the chat model of the chosen provider
+    top_k: int = 5
+    candidates: int = 20  # per retriever and query, before fusion
+    timezone: str = "Europe/Rome"
+    request_timeout_s: float = 60.0
 
-    # "openai" (multilingual, recommended), "local" (Chroma's built-in MiniLM ONNX model,
-    # offline but English-centric) or "auto" (openai if a key is set, else local).
-    embedding_provider: str = _env("EMBEDDING_PROVIDER", "auto")
-    openai_embedding_model: str = _env("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
+        """Build settings from environment variables; 'auto' providers follow the keys present."""
+        env = os.environ if env is None else env
 
-    # "openai", "anthropic" or "auto" (whichever key is set, OpenAI first).
-    llm_provider: str = _env("LLM_PROVIDER", "auto")
-    openai_chat_model: str = _env("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
-    anthropic_model: str = _env("ANTHROPIC_MODEL", "claude-opus-5-5")
+        def get(name: str, default: str = "") -> str:
+            return env.get(name, "").strip() or default
 
-    top_k: int = int(_env("TOP_K", "5"))
-    candidates: int = 20  # per retriever, before rank fusion
-    timezone: str = _env("TIMEZONE", "Europe/Rome")
+        has_openai, has_anthropic = bool(get("OPENAI_API_KEY")), bool(get("ANTHROPIC_API_KEY"))
 
-    @property
-    def has_openai(self) -> bool:
-        return bool(os.getenv("OPENAI_API_KEY", "").strip())
+        embedding = get("EMBEDDING_PROVIDER", "auto")
+        if embedding == "auto":
+            embedding = "openai" if has_openai else "local"
+        if embedding not in ("openai", "local"):
+            raise ConfigError(f"EMBEDDING_PROVIDER must be openai, local or auto, not '{embedding}'")
 
-    @property
-    def has_anthropic(self) -> bool:
-        return bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
+        llm = get("LLM_PROVIDER", "auto")
+        if llm == "auto":
+            llm = "openai" if has_openai else "anthropic" if has_anthropic else ""
+        if llm not in ("openai", "anthropic", ""):
+            raise ConfigError(f"LLM_PROVIDER must be openai, anthropic or auto, not '{llm}'")
 
-    def resolved_embedding_provider(self) -> str:
-        if self.embedding_provider != "auto":
-            return self.embedding_provider
-        return "openai" if self.has_openai else "local"
-
-    def resolved_llm_provider(self) -> str | None:
-        if self.llm_provider != "auto":
-            return self.llm_provider
-        if self.has_openai:
-            return "openai"
-        if self.has_anthropic:
-            return "anthropic"
-        return None
+        defaults = cls()
+        return cls(
+            data_dir=Path(get("DATA_DIR", str(defaults.data_dir))),
+            index_dir=Path(get("INDEX_DIR", str(defaults.index_dir))),
+            embedding_provider=cast(EmbeddingProvider, embedding),  # validated above
+            openai_embedding_model=get("OPENAI_EMBEDDING_MODEL", defaults.openai_embedding_model),
+            llm_provider=cast(LLMProvider, llm) if llm else None,
+            openai_chat_model=get("OPENAI_CHAT_MODEL", defaults.openai_chat_model),
+            anthropic_model=get("ANTHROPIC_MODEL", defaults.anthropic_model),
+            planner_model=get("PLANNER_MODEL") or None,
+            top_k=int(get("TOP_K", str(defaults.top_k))),
+            timezone=get("TIMEZONE", defaults.timezone),
+        )

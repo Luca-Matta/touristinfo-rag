@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "touristinfo-rag"
+version = "2.0.0"
+description = "Multilingual RAG tourist assistant for Kiens/Chienes (touristinfo.ai interview exercise)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "chromadb>=1.0",
+    "rank-bm25>=0.2.2",
+    "pydantic>=2.6",
+    "openai>=1.40",
+    "anthropic>=0.70",
+    "python-dotenv>=1.0",
+    "tzdata; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+crawl = ["requests>=2.31", "beautifulsoup4>=4.12"]
+browser = ["playwright>=1.45"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "types-requests"]
+
+[project.scripts]
+kiens-chat = "rag.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["rag*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "BLE"]
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # en dashes and accented letters are intended
+    "SIM905",  # word lists read better as one string
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["rag"]
+strict = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["rank_bm25"]
+ignore_missing_imports = true

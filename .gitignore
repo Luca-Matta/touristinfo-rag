@@ -5,3 +5,7 @@ venv/
 .env
 .chroma/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+eval/.cache/

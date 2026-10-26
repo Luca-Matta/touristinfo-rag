@@ -1,9 +1,2 @@
-chromadb>=1.0
-rank-bm25>=0.2.2
-openai>=1.40
-anthropic>=2.0
-python-dotenv>=1.0
-tzdata  # time zones on Windows
-beautifulsoup4  # crawling bonus
-requests        # crawling bonus
-pytest>=8
+# Everything (app, crawler, tests and linters). Equivalent to: pip install -e ".[crawl,dev]"
+-e .[crawl,dev]

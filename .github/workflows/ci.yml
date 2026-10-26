@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[crawl,dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+      - run: pytest
+      # Offline retrieval eval (local embeddings, no API key): a regression check on search quality.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+      - run: python -m eval.run_eval retrieval --split all

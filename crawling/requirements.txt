@@ -1,5 +1,0 @@
-requests
-beautifulsoup4
-openai          # optional: LLM-written description (falls back to a template without a key)
-python-dotenv
-playwright      # optional: only used if the plain HTTP fetch fails; run `playwright install chromium`
