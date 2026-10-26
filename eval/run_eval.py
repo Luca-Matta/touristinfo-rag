@@ -152,15 +152,17 @@ JUDGE_CHECKS = ("grounded", "correct", "complete", "language_ok")
 
 JUDGE_SYSTEM = """\
 You are a strict grader of a tourist information chatbot. You get the guest's question \
-(with the conversation before it), the sources the bot was given, the reference records \
-that contain the right answer, an optional note from the eval author, and the bot's answer.
+(with the conversation before it and the time it was asked), the sources the bot was \
+given, the reference records that contain the right answer, an optional note from the \
+eval author, and the bot's answer.
 
 First list every issue you find, one short sentence each, quoting the answer; then decide. \
 Be strict: one unsupported or wrong detail is enough to fail a check.
 - grounded: every factual claim in the answer (names, hours, prices, phone numbers, \
 addresses, what a place offers, whether it is open, praise such as "excellent") is stated \
 in the sources. A phone number or address attributed to the wrong place is not grounded. \
-Plain advice ("ask the tourist office") is fine.
+Plain advice ("ask the tourist office") is fine, and so are dates and weekdays worked out \
+from the time the question was asked and the sources' Status lines ("tomorrow, Tuesday 27.10").
 - correct: the answer gives the right answer according to the reference records and \
 note, and does not contradict itself. If the reference records answer the question and \
 the bot says the information is missing, that is not correct. If there are no reference \
@@ -224,7 +226,9 @@ def answers_eval(assistant: TouristAssistant, items: list[EvalItem], judge_model
             expected = [assistant.corpus[rid] for rid in item.expected]
             history = "\n".join(f"{m['role']}: {m['content']}" for m in item.history)
             prompt = (
-                (f"Conversation before:\n{history}\n\n" if history else "") + f"Question: {item.question}\n\n"
+                (f"Conversation before:\n{history}\n\n" if history else "")
+                + f"Asked at (local time): {now:%A %d %B %Y, %H:%M}\n"
+                + f"Question: {item.question}\n\n"
                 f"<sources>\n{format_sources(answer.sources, answer.plan, now)}\n</sources>\n\n"
                 f"<reference_records>\n{format_sources(expected, answer.plan, now)}\n</reference_records>\n\n"
                 + (f"Note from the eval author: {item.reference}\n\n" if item.reference else "")

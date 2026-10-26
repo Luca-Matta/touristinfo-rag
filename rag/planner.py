@@ -150,7 +150,8 @@ conversation, in the guest's language. Only resolve references; add nothing else
   Never add the destination name (Kiens/Chienes) or other places the guest did not mention: \
 every source is about the area, so it only dilutes the search.
 - language: the language of the latest message (en, de, it, or other).
-- categories: place categories the guest asks about; empty if none or unsure. Options:
+- categories: the kinds of place the guest explicitly asks for ("a bakery", "churches"); empty \
+for broad questions about sights, activities or travel, and if unsure. Options:
 {categories}
 - day: the day the guest asks about, as said: "today" (also "tonight"), "tomorrow", \
 "day_after_tomorrow" or a weekday ("monday" ... "sunday"); otherwise null. Do not convert \

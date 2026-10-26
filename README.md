@@ -156,10 +156,10 @@ data cannot answer. They are split per language into `dev` (46, inspect and tune
   must match as a whole number, so "5 rooms" is not found inside a phone number) and the
   forbidden phrases. `--judge` adds an LLM judge that is a different, stronger model than
   the one answering (`gpt-4.1` by default, `--judge-model` to change it). It sees the
-  expected records and the reference note next to the retrieved sources, lists the
-  issues it finds, and grades grounded, correct, complete and language. Every row,
-  including the plan and the sources, is appended to `eval/.cache/answers-*.jsonl` as
-  it is produced.
+  time the question was asked, the expected records and the reference note next to the
+  retrieved sources, lists the issues it finds, and grades grounded, correct, complete
+  and language. Every row, including the plan and the sources, is appended to
+  `eval/.cache/answers-*.jsonl` as it is produced.
 
 **Retrieval**, hit@5 / MRR over the 67 questions with an expected source:
 
@@ -182,19 +182,19 @@ tourist office, a detail about Bolzano station). The fact checks had passed by
 coincidence (a "5" inside a phone number), and the judge was the answering model, seeing
 only the retrieved sources. The checks and the judge described above are the response.
 
-With them (all 69 questions, `gpt-4.1-mini` answering, `gpt-4.1` judging), before and
-after tightening the answer prompt:
+With them (all 69 questions, `gpt-4.1-mini` answering, `gpt-4.1` judging): the first
+run, after tightening the answer prompt, and after three fixes found in that run (below):
 
-| check | first run | prompt tightened |
-| --- | --- | --- |
-| an expected source among the sources | 100% | 100% |
-| all required facts in the answer | 99% | 99% |
-| no forbidden phrase | 100% | 100% |
-| judge: grounded | 72% | 83% |
-| judge: correct | 88% | 94% |
-| judge: complete | 94% | 91% |
-| judge: answered in the guest's language | 100% | 100% |
-| judge: all four checks | 71% | 77% |
+| check | first run | prompt tightened | three fixes |
+| --- | --- | --- | --- |
+| an expected source among the sources | 100% | 100% | 100% |
+| all required facts in the answer | 99% | 99% | 100% |
+| no forbidden phrase | 100% | 100% | 100% |
+| judge: grounded | 72% | 83% | 87% |
+| judge: correct | 88% | 94% | 96% |
+| judge: complete | 94% | 91% | 97% |
+| judge: answered in the guest's language | 100% | 100% | 100% |
+| judge: all four checks | 71% | 77% | 87% |
 
 Retrieval was never the problem: every failure is in the answer. In the first run most
 were embellishment (praise and adjectives the sources do not use: "excellent bakeries",
@@ -202,13 +202,25 @@ were embellishment (praise and adjectives the sources do not use: "excellent bak
 (q22), Ehrenburg castle called "private property" (q40), lifts at Bolzano station (q57),
 Market Engl's afternoon hours left out (q02). The answer prompt now says to keep
 qualifiers, add no praise, credit contact details only to their own place and give every
-opening interval, and those four are fixed. What remains is mostly the judge being
-strict to the point of pedantry ("honeydew honey", "lecker", a hike "suitable for
-families" when the source says "family walk") plus two real slips: bus rules applied to
-trains (q55) and a church's phone number offered as the way to get the key (q51).
+opening interval. Three of those four stayed fixed; the lifts at Bolzano station (q57)
+came back in a later run.
 
-The prompt rules were written after reading these failures, so the second column
-flatters the prompt; the 23 test questions are the fairer check, and one run is one
+The three fixes: a day without listed hours was called "closed" (the prompt now says
+"probably closed"); for "what sights are there in winter?" the planner set a church and
+castle filter that hid the sights page (it now sets categories only when the guest asks
+for a kind of place); and the judge failed dates the code had computed ("tomorrow,
+Tuesday 27.10") because it did not know when the question was asked (it now does, so
+the third column's judge is not exactly the second one's).
+
+Nine questions still fail. Five are the judge being strict to the point of pedantry
+("delicious pizzas", "family-friendly" for "family atmosphere", a hike "suitable for
+families" when the source says "family walk"). Four are real slips: lifts at Bolzano
+station (q57), a phone number credited to the tourist office (q51), a "valid certificate"
+the sources do not require for free transport (q60), and a museum "probably closed" in
+December when December is outside its season (q44).
+
+The prompt rules were written after reading these failures, so the later columns
+flatter the prompt; the 23 test questions are the fairer check, and one run is one
 sample. The full per-question issues are in `eval/.cache/answers-*.jsonl`.
 
 **How the eval changed the code.** The first run with a key showed four misses: the
